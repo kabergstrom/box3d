@@ -600,6 +600,10 @@ void b3TransferBody( b3World* world, b3SolverSet* targetSet, b3SolverSet* source
 	if ( sourceSet->setIndex == b3_awakeSet )
 	{
 		b3Array_RemoveSwap( sourceSet->bodyStates, sourceIndex );
+
+		// Move events are rebuilt for awake bodies only. A stale index would make a later forced
+		// sleep write into another body's event or past the end of the array.
+		body->bodyMoveIndex = B3_NULL_INDEX;
 	}
 	else if ( targetSet->setIndex == b3_awakeSet )
 	{

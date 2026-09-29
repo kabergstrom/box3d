@@ -475,8 +475,51 @@ static int ShapeExtents( void )
 	return 0;
 }
 
+// Move events are rebuilt each step for awake bodies only. A body that leaves the awake set by being
+// disabled must drop its move event index, otherwise forcing it asleep after re-enabling writes
+// through a stale index into another body's event or past the end of the array.
+static int ForcedSleepAfterDisable( void )
+{
+	b3WorldDef worldDef = b3DefaultWorldDef();
+	b3WorldId worldId = b3CreateWorld( &worldDef );
+
+	b3BodyId bodyIds[3];
+	for ( int i = 0; i < 3; ++i )
+	{
+		b3BodyDef bodyDef = b3DefaultBodyDef();
+		bodyDef.type = b3_dynamicBody;
+		bodyDef.position = (b3Pos){ 3.0f * i, 5.0f, 0.0f };
+		bodyIds[i] = b3CreateBody( worldId, &bodyDef );
+		b3ShapeDef shapeDef = b3DefaultShapeDef();
+		b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, 0.5f };
+		b3CreateSphereShape( bodyIds[i], &shapeDef, &sphere );
+	}
+
+	// All three move, then two leave the awake set and the next step emits one move event
+	b3World_Step( worldId, 1.0f / 60.0f, 4 );
+	b3Body_Disable( bodyIds[0] );
+	b3Body_Disable( bodyIds[1] );
+	b3World_Step( worldId, 1.0f / 60.0f, 4 );
+
+	b3World* world = b3GetWorldFromId( worldId );
+	b3Body* body = world->bodies.data + ( bodyIds[1].index1 - 1 );
+	ENSURE( body->bodyMoveIndex == B3_NULL_INDEX );
+
+	b3Body_Enable( bodyIds[1] );
+	b3Body_SetAwake( bodyIds[1], false );
+	ENSURE( b3Body_IsAwake( bodyIds[1] ) == false );
+
+	b3BodyEvents moveEvents = b3World_GetBodyEvents( worldId );
+	ENSURE( moveEvents.moveCount == 1 );
+	ENSURE( moveEvents.moveEvents[0].fellAsleep == false );
+
+	b3DestroyWorld( worldId );
+	return 0;
+}
+
 int BodyTest( void )
 {
+	RUN_SUBTEST( ForcedSleepAfterDisable );
 	RUN_SUBTEST( FarSingleSphereMass );
 	RUN_SUBTEST( FarCubeSphereMass );
 	RUN_SUBTEST( DeferredMassExtents );
