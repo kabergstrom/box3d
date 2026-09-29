@@ -552,7 +552,7 @@ void b3WarmStartWheelJoint( b3JointSim* base, b3StepContext* context )
 	b3Vec3 linearImpulse = b3Blend3( suspensionImpulse, matrixA.cx, linearImpulseY, matrixA.cy, linearImpulseZ, matrixA.cz );
 	b3Vec3 angularImpulseA = b3Blend3( suspensionImpulse, sAx, linearImpulseY, sAy, linearImpulseZ, sAz );
 	b3Vec3 angularImpulseB = b3Blend3( suspensionImpulse, sBx, linearImpulseY, sBy, linearImpulseZ, sBz );
-	b3Vec3 angularImpulse = b3MulSV( joint->spinImpulse, matrixA.cz );
+	b3Vec3 angularImpulse;
 
 	b3Vec3 spinAxis = matrixB.cz;
 
@@ -577,9 +577,7 @@ void b3WarmStartWheelJoint( b3JointSim* base, b3StepContext* context )
 			0.5f, b3RotateVector( quatA, b3Add( b3MulSV( relQ.s, b3Vec3_axisX ), b3Cross( relQ.v, b3Vec3_axisX ) ) ) );
 		b3Vec3 perpAxisY = b3MulSV(
 			0.5f, b3RotateVector( quatA, b3Add( b3MulSV( relQ.s, b3Vec3_axisY ), b3Cross( relQ.v, b3Vec3_axisY ) ) ) );
-		angularImpulse = b3Add(
-			angularImpulse,
-			b3Blend3( angularImpulseX, perpAxisX, angularImpulseY, perpAxisY, joint->spinImpulse, spinAxis ) );
+		angularImpulse = b3Blend3( angularImpulseX, perpAxisX, angularImpulseY, perpAxisY, joint->spinImpulse, spinAxis );
 	}
 
 	if ( stateA->flags & b3_dynamicFlag )
