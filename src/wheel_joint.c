@@ -28,7 +28,7 @@ void b3WheelJoint_EnableSuspension( b3JointId jointId, bool enableSpring )
 
 bool b3WheelJoint_IsSuspensionEnabled( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.enableSuspensionSpring;
 }
 
@@ -42,7 +42,7 @@ void b3WheelJoint_SetSuspensionHertz( b3JointId jointId, float hertz )
 
 float b3WheelJoint_GetSuspensionHertz( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.suspensionHertz;
 }
 
@@ -56,7 +56,7 @@ void b3WheelJoint_SetSuspensionDampingRatio( b3JointId jointId, float dampingRat
 
 float b3WheelJoint_GetSuspensionDampingRatio( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.suspensionDampingRatio;
 }
 
@@ -75,19 +75,19 @@ void b3WheelJoint_EnableSuspensionLimit( b3JointId jointId, bool enableLimit )
 
 bool b3WheelJoint_IsSuspensionLimitEnabled( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.enableSuspensionLimit;
 }
 
 float b3WheelJoint_GetLowerSuspensionLimit( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.lowerSuspensionLimit;
 }
 
 float b3WheelJoint_GetUpperSuspensionLimit( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.upperSuspensionLimit;
 }
 
@@ -120,7 +120,7 @@ void b3WheelJoint_EnableSpinMotor( b3JointId jointId, bool enableMotor )
 
 bool b3WheelJoint_IsSpinMotorEnabled( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.enableSpinMotor;
 }
 
@@ -134,7 +134,7 @@ void b3WheelJoint_SetSpinMotorSpeed( b3JointId jointId, float motorSpeed )
 
 float b3WheelJoint_GetSpinMotorSpeed( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.spinSpeed;
 }
 
@@ -148,7 +148,7 @@ void b3WheelJoint_SetMaxSpinTorque( b3JointId jointId, float torque )
 
 float b3WheelJoint_GetMaxSpinTorque( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.maxSpinTorque;
 }
 
@@ -166,7 +166,7 @@ void b3WheelJoint_EnableSteering( b3JointId jointId, bool flag )
 
 bool b3WheelJoint_IsSteeringEnabled( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.enableSteering;
 }
 
@@ -180,7 +180,7 @@ void b3WheelJoint_SetSteeringHertz( b3JointId jointId, float hertz )
 
 float b3WheelJoint_GetSteeringHertz( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.steeringHertz;
 }
 
@@ -194,7 +194,7 @@ void b3WheelJoint_SetSteeringDampingRatio( b3JointId jointId, float dampingRatio
 
 float b3WheelJoint_GetSteeringDampingRatio( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.steeringDampingRatio;
 }
 
@@ -208,7 +208,7 @@ void b3WheelJoint_SetMaxSteeringTorque( b3JointId jointId, float maxTorque )
 
 float b3WheelJoint_GetMaxSteeringTorque( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.maxSteeringTorque;
 }
 
@@ -227,19 +227,19 @@ void b3WheelJoint_EnableSteeringLimit( b3JointId jointId, bool flag )
 
 bool b3WheelJoint_IsSteeringLimitEnabled( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.enableSteeringLimit;
 }
 
 float b3WheelJoint_GetLowerSteeringLimit( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.lowerSteeringLimit;
 }
 
 float b3WheelJoint_GetUpperSteeringLimit( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.upperSteeringLimit;
 }
 
@@ -263,14 +263,14 @@ void b3WheelJoint_SetTargetSteeringAngle( b3JointId jointId, float radians )
 
 float b3WheelJoint_GetTargetSteeringAngle( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return joint->wheelJoint.targetSteeringAngle;
 }
 
 float b3WheelJoint_GetSpinSpeed( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 
 	int idA = base->bodyIdA;
 	int idB = base->bodyIdB;
@@ -306,14 +306,14 @@ float b3WheelJoint_GetSpinSpeed( b3JointId jointId )
 float b3WheelJoint_GetSpinTorque( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return world->inv_h * joint->wheelJoint.spinImpulse;
 }
 
 float b3WheelJoint_GetSteeringAngle( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 
 	int idA = base->bodyIdA;
 	int idB = base->bodyIdB;
@@ -346,7 +346,7 @@ float b3WheelJoint_GetSteeringAngle( b3JointId jointId )
 float b3WheelJoint_GetSteeringTorque( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_wheelJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_wheelJoint );
 	return world->inv_h * joint->wheelJoint.steeringSpringImpulse;
 }
 

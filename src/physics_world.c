@@ -17,6 +17,7 @@
 #include "parallel_for.h"
 #include "platform.h"
 #include "recording.h"
+#include "world_delta.h"
 #include "scheduler.h"
 #include "sensor.h"
 #include "shape.h"
@@ -417,6 +418,9 @@ void b3DestroyWorld( b3WorldId worldId )
 
 	// Detach any recording before teardown. The user owns and frees the recording buffer.
 	b3StopRecordingInternal( world );
+
+	// Release the hull references a delta tracker holds while the hull database is still alive
+	b3DeltaDetachWorld( world );
 
 	if ( world->scheduler != NULL )
 	{
@@ -1046,6 +1050,7 @@ void b3World_Step( b3WorldId worldId, float timeStep, int subStepCount )
 	B3_REC( world, Step, worldId, timeStep, subStepCount );
 
 	world->locked = true;
+	world->stepping = true;
 
 	b3TracyCZoneNC( world_step, "Step", b3_colorBox2DGreen, true );
 
@@ -1176,6 +1181,7 @@ void b3World_Step( b3WorldId worldId, float timeStep, int subStepCount )
 	world->endEventArrayIndex = 1 - world->endEventArrayIndex;
 	b3Array_Clear( world->sensorEndEvents[world->endEventArrayIndex] );
 	b3Array_Clear( world->contactEndEvents[world->endEventArrayIndex] );
+	world->stepping = false;
 	world->locked = false;
 
 	if ( world->recording != NULL )

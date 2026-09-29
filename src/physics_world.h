@@ -286,11 +286,18 @@ typedef struct b3World
 
 	uint16_t worldId;
 
+	// Incremental snapshot tracker, may be NULL
+	struct b3WorldDelta* delta;
+
 	bool enableSleep;
 
 	// This indicates there is a world write operation in progress. This is for debugging and
 	// not a real mutex. This should have minimal performance impact.
 	bool locked;
+
+	// True inside b3World_Step. Read-only API calls from callbacks run on workers and must not mark
+	// the delta tracker.
+	bool stepping;
 	bool enableWarmStarting;
 	bool enableContinuous;
 	bool enableSpeculative;

@@ -348,8 +348,10 @@ typedef struct b3JointSim
 void b3DestroyJointInternal( b3World* world, b3Joint* joint, bool wakeBodies );
 
 b3Joint* b3GetJointFullId( b3World* world, b3JointId jointId );
+b3Joint* b3ReadJointFullId( b3World* world, b3JointId jointId );
 b3JointSim* b3GetJointSim( b3World* world, b3Joint* joint );
 b3JointSim* b3GetJointSimCheckType( b3JointId jointId, b3JointType type );
+b3JointSim* b3ReadJointSimCheckType( b3JointId jointId, b3JointType type );
 
 void b3PrepareJoint( b3JointSim* joint, b3StepContext* context );
 void b3WarmStartJoint( b3JointSim* joint, b3StepContext* context );

@@ -31,6 +31,7 @@ set(BOX3D_TEST_FILES
     test_shape.c
     test_table.c
     test_world.c
+    test_world_delta.c
 )
 
 add_executable(test ${BOX3D_TEST_FILES})

@@ -33,6 +33,9 @@ const char* b3FindName( const b3NameCache* cache, uint32_t id );
 // Load a name from a recording. Name ownership is transferred.
 void b3LoadName( b3NameCache* cache, uint32_t id, char* name, int length );
 
+// Drop the newest entries down to count. Names are append only, so this undoes later additions.
+void b3TruncateNames( b3NameCache* cache, int count );
+
 uint32_t b3Hash32( const void* data, size_t length );
 
 static inline const char* b3FindNameWithDefault( const b3NameCache* cache, uint32_t id, const char* def )

@@ -53,6 +53,7 @@ extern int SeparatingAxisTest( void );
 extern int ShapeTest( void );
 extern int TableTest( void );
 extern int WorldTest( void );
+extern int WorldDeltaTest( void );
 
 // Filter-aware test runner: skips tests that don't match the filter
 #define MAYBE_RUN_TEST( T )                                                                                                      \
@@ -131,6 +132,7 @@ int main( int argc, char** argv )
 	MAYBE_RUN_TEST( ShapeTest );
 	MAYBE_RUN_TEST( TableTest );
 	MAYBE_RUN_TEST( WorldTest );
+	MAYBE_RUN_TEST( WorldDeltaTest );
 
 	printf( "======================================\n" );
 	printf( "All Box3D tests passed!\n" );

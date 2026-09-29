@@ -11,6 +11,7 @@
 #include "joint.h"
 #include "physics_world.h"
 #include "recording.h"
+#include "world_delta.h"
 #include "sensor.h"
 #include "shape.h"
 #include "solver_set.h"
@@ -27,7 +28,20 @@ b3Body* b3GetBodyFullId( b3World* world, b3BodyId bodyId )
 	B3_ASSERT( b3Body_IsValid( bodyId ) );
 
 	// id index starts at one so that zero can represent null
-	// id index starts at one so that zero can represent null
+	b3Body* body = b3Array_Get( world->bodies, bodyId.index1 - 1 );
+
+	// Every public body call may mutate, so the delta tracker is told before it happens
+	if ( world->delta != NULL )
+	{
+		b3DeltaMarkBody( world, bodyId.index1 - 1 );
+	}
+	return body;
+}
+
+// Read-only public calls skip the delta mark
+b3Body* b3ReadBodyFullId( b3World* world, b3BodyId bodyId )
+{
+	B3_ASSERT( b3Body_IsValid( bodyId ) );
 	return b3Array_Get( world->bodies, bodyId.index1 - 1 );
 }
 
@@ -469,7 +483,7 @@ int b3Body_GetContactCapacity( b3BodyId bodyId )
 		return 0;
 	}
 
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 
 	// Conservative and fast
 	return body->contactCount;
@@ -483,7 +497,7 @@ int b3Body_GetContactData( b3BodyId bodyId, b3ContactData* contactData, int capa
 		return 0;
 	}
 
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 
 	int contactKey = body->headContactKey;
 	int index = 0;
@@ -552,7 +566,7 @@ float b3Body_GetClosestPoint( b3BodyId bodyId, b3Vec3* result, b3Vec3 target )
 		return 0.0f;
 	}
 
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3WorldTransform worldTransform = b3GetBodyTransform( world, body->id );
 	b3Transform transform = b3ToRelativeTransform( worldTransform, b3Pos_zero );
 
@@ -1057,7 +1071,7 @@ void b3UpdateBodyMassData( b3World* world, b3Body* body )
 b3Pos b3Body_GetPosition( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3WorldTransform transform = b3GetBodyTransformQuick( world, body );
 	return transform.p;
 }
@@ -1065,7 +1079,7 @@ b3Pos b3Body_GetPosition( b3BodyId bodyId )
 b3Quat b3Body_GetRotation( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3WorldTransform transform = b3GetBodyTransformQuick( world, body );
 	return transform.q;
 }
@@ -1073,14 +1087,14 @@ b3Quat b3Body_GetRotation( b3BodyId bodyId )
 b3WorldTransform b3Body_GetTransform( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return b3GetBodyTransformQuick( world, body );
 }
 
 b3Vec3 b3Body_GetLocalPoint( b3BodyId bodyId, b3Pos worldPoint )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3WorldTransform transform = b3GetBodyTransformQuick( world, body );
 	return b3InvTransformWorldPoint( transform, worldPoint );
 }
@@ -1088,7 +1102,7 @@ b3Vec3 b3Body_GetLocalPoint( b3BodyId bodyId, b3Pos worldPoint )
 b3Pos b3Body_GetWorldPoint( b3BodyId bodyId, b3Vec3 localPoint )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3WorldTransform transform = b3GetBodyTransformQuick( world, body );
 	return b3TransformWorldPoint( transform, localPoint );
 }
@@ -1096,7 +1110,7 @@ b3Pos b3Body_GetWorldPoint( b3BodyId bodyId, b3Vec3 localPoint )
 b3Vec3 b3Body_GetLocalVector( b3BodyId bodyId, b3Vec3 worldVector )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3WorldTransform transform = b3GetBodyTransformQuick( world, body );
 	return b3InvRotateVector( transform.q, worldVector );
 }
@@ -1104,7 +1118,7 @@ b3Vec3 b3Body_GetLocalVector( b3BodyId bodyId, b3Vec3 worldVector )
 b3Vec3 b3Body_GetWorldVector( b3BodyId bodyId, b3Vec3 localVector )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3WorldTransform transform = b3GetBodyTransformQuick( world, body );
 	return b3RotateVector( transform.q, localVector );
 }
@@ -1164,7 +1178,7 @@ void b3Body_SetTransform( b3BodyId bodyId, b3Pos position, b3Quat rotation )
 b3Vec3 b3Body_GetLinearVelocity( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodyState* state = b3GetBodyState( world, body );
 	if ( state != NULL )
 	{
@@ -1176,7 +1190,7 @@ b3Vec3 b3Body_GetLinearVelocity( b3BodyId bodyId )
 b3Vec3 b3Body_GetAngularVelocity( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodyState* state = b3GetBodyState( world, body );
 	if ( state != NULL )
 	{
@@ -1324,7 +1338,7 @@ void b3Body_SetTargetTransform( b3BodyId bodyId, b3WorldTransform target, float 
 b3Vec3 b3Body_GetLocalPointVelocity( b3BodyId bodyId, b3Vec3 localPoint )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodyState* state = b3GetBodyState( world, body );
 	if ( state == NULL )
 	{
@@ -1342,7 +1356,7 @@ b3Vec3 b3Body_GetLocalPointVelocity( b3BodyId bodyId, b3Vec3 localPoint )
 b3Vec3 b3Body_GetWorldPointVelocity( b3BodyId bodyId, b3Pos worldPoint )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodyState* state = b3GetBodyState( world, body );
 	if ( state == NULL )
 	{
@@ -1527,7 +1541,7 @@ void b3Body_ApplyAngularImpulse( b3BodyId bodyId, b3Vec3 impulse, bool wake )
 b3BodyType b3Body_GetType( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return body->type;
 }
 
@@ -1789,7 +1803,7 @@ void b3Body_SetName( b3BodyId bodyId, const char* name )
 const char* b3Body_GetName( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return b3FindNameWithDefault( &world->names, body->nameId, "" );
 }
 
@@ -1803,28 +1817,28 @@ void b3Body_SetUserData( b3BodyId bodyId, void* userData )
 void* b3Body_GetUserData( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return body->userData;
 }
 
 float b3Body_GetMass( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return body->mass;
 }
 
 b3Matrix3 b3Body_GetLocalRotationalInertia( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return body->inertia;
 }
 
 float b3Body_GetInverseMass( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* sim = b3GetBodySim( world, body );
 	return sim->invMass;
 }
@@ -1832,7 +1846,7 @@ float b3Body_GetInverseMass( b3BodyId bodyId )
 b3Matrix3 b3Body_GetWorldInverseRotationalInertia( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* sim = b3GetBodySim( world, body );
 	return sim->invInertiaWorld;
 }
@@ -1840,7 +1854,7 @@ b3Matrix3 b3Body_GetWorldInverseRotationalInertia( b3BodyId bodyId )
 b3Vec3 b3Body_GetLocalCenter( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* bodySim = b3GetBodySim( world, body );
 	return bodySim->localCenter;
 }
@@ -1848,7 +1862,7 @@ b3Vec3 b3Body_GetLocalCenter( b3BodyId bodyId )
 b3Pos b3Body_GetWorldCenter( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* bodySim = b3GetBodySim( world, body );
 	return bodySim->center;
 }
@@ -1947,7 +1961,7 @@ void b3Body_SetMassData( b3BodyId bodyId, b3MassData massData )
 b3MassData b3Body_GetMassData( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* bodySim = b3GetBodySim( world, body );
 	b3MassData massData = { body->mass, bodySim->localCenter, body->inertia };
 	return massData;
@@ -1987,7 +2001,7 @@ void b3Body_SetLinearDamping( b3BodyId bodyId, float linearDamping )
 float b3Body_GetLinearDamping( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* bodySim = b3GetBodySim( world, body );
 	return bodySim->linearDamping;
 }
@@ -2012,7 +2026,7 @@ void b3Body_SetAngularDamping( b3BodyId bodyId, float angularDamping )
 float b3Body_GetAngularDamping( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* bodySim = b3GetBodySim( world, body );
 	return bodySim->angularDamping;
 }
@@ -2039,7 +2053,7 @@ float b3Body_GetGravityScale( b3BodyId bodyId )
 {
 	B3_ASSERT( b3Body_IsValid( bodyId ) );
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* bodySim = b3GetBodySim( world, body );
 	return bodySim->gravityScale;
 }
@@ -2047,7 +2061,7 @@ float b3Body_GetGravityScale( b3BodyId bodyId )
 bool b3Body_IsAwake( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return body->setIndex == b3_awakeSet;
 }
 
@@ -2087,14 +2101,14 @@ void b3Body_SetAwake( b3BodyId bodyId, bool awake )
 bool b3Body_IsEnabled( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return body->setIndex != b3_disabledSet;
 }
 
 bool b3Body_IsSleepEnabled( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return ( body->flags & b3_enableSleep ) == b3_enableSleep;
 }
 
@@ -2111,7 +2125,7 @@ void b3Body_SetSleepThreshold( b3BodyId bodyId, float sleepThreshold )
 float b3Body_GetSleepThreshold( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return body->sleepThreshold;
 }
 
@@ -2134,7 +2148,7 @@ void b3Body_SetSafetyFactor( b3BodyId bodyId, float safetyFactor )
 float b3Body_GetSafetyFactor( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return body->safetyFactor;
 }
 
@@ -2416,7 +2430,7 @@ void b3Body_SetMotionLocks( b3BodyId bodyId, b3MotionLocks locks )
 b3MotionLocks b3Body_GetMotionLocks( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 
 	b3MotionLocks locks;
 	locks.linearX = ( body->flags & b3_lockLinearX );
@@ -2455,7 +2469,7 @@ void b3Body_SetBullet( b3BodyId bodyId, bool flag )
 bool b3Body_IsBullet( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return ( body->flags & b3_isBullet ) != 0;
 }
 
@@ -2486,7 +2500,7 @@ void b3Body_AllowFastRotation( b3BodyId bodyId, bool flag )
 bool b3Body_IsFastRotationAllowed( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return ( body->flags & b3_allowFastRotation ) != 0;
 }
 
@@ -2517,7 +2531,7 @@ void b3Body_EnableContactRecycling( b3BodyId bodyId, bool flag )
 bool b3Body_IsContactRecyclingEnabled( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return ( body->flags & b3_bodyEnableContactRecycling ) != 0;
 }
 
@@ -2546,14 +2560,14 @@ b3WorldId b3Body_GetWorld( b3BodyId bodyId )
 int b3Body_GetShapeCount( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return body->shapeCount;
 }
 
 int b3Body_GetShapes( b3BodyId bodyId, b3ShapeId* shapeArray, int capacity )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	int shapeId = body->headShapeId;
 	int shapeCount = 0;
 	while ( shapeId != B3_NULL_INDEX && shapeCount < capacity )
@@ -2572,14 +2586,14 @@ int b3Body_GetShapes( b3BodyId bodyId, b3ShapeId* shapeArray, int capacity )
 int b3Body_GetJointCount( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	return body->jointCount;
 }
 
 int b3Body_GetJoints( b3BodyId bodyId, b3JointId* jointArray, int capacity )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	int jointKey = body->headJointKey;
 
 	int jointCount = 0;
@@ -2641,7 +2655,7 @@ bool b3ShouldBodiesCollide( b3World* world, b3Body* bodyA, b3Body* bodyB )
 float b3Body_GetMinExtent( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* bodySim = b3GetBodySim( world, body );
 	return bodySim->minExtent;
 }
@@ -2649,7 +2663,7 @@ float b3Body_GetMinExtent( b3BodyId bodyId )
 b3Vec3 b3Body_GetMaxExtent( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* bodySim = b3GetBodySim( world, body );
 	return bodySim->maxExtent;
 }
@@ -2657,7 +2671,7 @@ b3Vec3 b3Body_GetMaxExtent( b3BodyId bodyId )
 b3Vec3 b3Body_GetMaxExtentOrigin( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
-	b3Body* body = b3GetBodyFullId( world, bodyId );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
 	b3BodySim* bodySim = b3GetBodySim( world, body );
 	return b3Add( bodySim->maxExtent, b3Abs( bodySim->localCenter ) );
 }

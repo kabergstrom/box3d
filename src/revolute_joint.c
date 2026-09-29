@@ -55,19 +55,19 @@ void b3RevoluteJoint_EnableLimit( b3JointId jointId, bool enableLimit )
 
 bool b3RevoluteJoint_IsLimitEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return base->revoluteJoint.enableLimit;
 }
 
 float b3RevoluteJoint_GetLowerLimit( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return base->revoluteJoint.lowerAngle;
 }
 
 float b3RevoluteJoint_GetUpperLimit( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return base->revoluteJoint.upperAngle;
 }
 
@@ -88,7 +88,7 @@ void b3RevoluteJoint_SetLimits( b3JointId jointId, float lowerLimitRadians, floa
 float b3RevoluteJoint_GetAngle( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	b3WorldTransform transformA = b3GetBodyTransform( world, base->bodyIdA );
 	b3WorldTransform transformB = b3GetBodyTransform( world, base->bodyIdB );
 
@@ -120,7 +120,7 @@ void b3RevoluteJoint_EnableSpring( b3JointId jointId, bool enableSpring )
 
 bool b3RevoluteJoint_IsSpringEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return base->revoluteJoint.enableSpring;
 }
 
@@ -135,7 +135,7 @@ void b3RevoluteJoint_SetTargetAngle( b3JointId jointId, float targetRadians )
 
 float b3RevoluteJoint_GetTargetAngle( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return base->revoluteJoint.targetAngle;
 }
 
@@ -150,7 +150,7 @@ void b3RevoluteJoint_SetSpringHertz( b3JointId jointId, float hertz )
 
 float b3RevoluteJoint_GetSpringHertz( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return base->revoluteJoint.hertz;
 }
 
@@ -165,7 +165,7 @@ void b3RevoluteJoint_SetSpringDampingRatio( b3JointId jointId, float dampingRati
 
 float b3RevoluteJoint_GetSpringDampingRatio( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return base->revoluteJoint.dampingRatio;
 }
 
@@ -183,7 +183,7 @@ void b3RevoluteJoint_EnableMotor( b3JointId jointId, bool enableMotor )
 
 bool b3RevoluteJoint_IsMotorEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return base->revoluteJoint.enableMotor;
 }
 
@@ -198,7 +198,7 @@ void b3RevoluteJoint_SetMotorSpeed( b3JointId jointId, float motorSpeed )
 
 float b3RevoluteJoint_GetMotorSpeed( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return base->revoluteJoint.motorSpeed;
 }
 
@@ -213,14 +213,14 @@ void b3RevoluteJoint_SetMaxMotorTorque( b3JointId jointId, float maxForce )
 
 float b3RevoluteJoint_GetMaxMotorTorque( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return base->revoluteJoint.maxMotorTorque;
 }
 
 float b3RevoluteJoint_GetMotorTorque( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_revoluteJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_revoluteJoint );
 	return world->inv_h * base->revoluteJoint.motorImpulse;
 }
 

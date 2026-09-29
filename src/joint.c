@@ -9,6 +9,7 @@
 #include "island.h"
 #include "physics_world.h"
 #include "recording.h"
+#include "world_delta.h"
 #include "shape.h"
 #include "solver.h"
 #include "solver_set.h"
@@ -122,6 +123,19 @@ b3Joint* b3GetJointFullId( b3World* world, b3JointId jointId )
 	int id = jointId.index1 - 1;
 	b3Joint* joint = b3Array_Get( world->joints, id );
 	B3_ASSERT( joint->jointId == id && joint->generation == jointId.generation );
+	if ( world->delta != NULL )
+	{
+		b3DeltaMarkJoint( world, id );
+	}
+	return joint;
+}
+
+// Read-only public calls skip the delta mark
+b3Joint* b3ReadJointFullId( b3World* world, b3JointId jointId )
+{
+	int id = jointId.index1 - 1;
+	b3Joint* joint = b3Array_Get( world->joints, id );
+	B3_ASSERT( joint->jointId == id && joint->generation == jointId.generation );
 	return joint;
 }
 
@@ -143,6 +157,18 @@ b3JointSim* b3GetJointSimCheckType( b3JointId jointId, b3JointType type )
 	B3_UNUSED( type );
 	b3World* world = b3GetWorld( jointId.world0 );
 	b3Joint* joint = b3GetJointFullId( world, jointId );
+	B3_ASSERT( joint->type == type );
+	b3JointSim* jointSim = b3GetJointSim( world, joint );
+	B3_ASSERT( jointSim->type == type );
+	return jointSim;
+}
+
+// Read-only variant for the joint getters, skips the delta mark
+b3JointSim* b3ReadJointSimCheckType( b3JointId jointId, b3JointType type )
+{
+	B3_UNUSED( type );
+	b3World* world = b3GetWorld( jointId.world0 );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	B3_ASSERT( joint->type == type );
 	b3JointSim* jointSim = b3GetJointSim( world, joint );
 	B3_ASSERT( jointSim->type == type );
@@ -399,7 +425,7 @@ void b3Joint_SetConstraintTuning( b3JointId jointId, float hertz, float dampingR
 void b3Joint_GetConstraintTuning( b3JointId jointId, float* hertz, float* dampingRatio )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	b3JointSim* base = b3GetJointSim( world, joint );
 	*hertz = base->constraintHertz;
 	*dampingRatio = base->constraintDampingRatio;
@@ -419,7 +445,7 @@ void b3Joint_SetForceThreshold( b3JointId jointId, float threshold )
 float b3Joint_GetForceThreshold( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	b3JointSim* base = b3GetJointSim( world, joint );
 	return base->forceThreshold;
 }
@@ -438,7 +464,7 @@ void b3Joint_SetTorqueThreshold( b3JointId jointId, float threshold )
 float b3Joint_GetTorqueThreshold( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	b3JointSim* base = b3GetJointSim( world, joint );
 	return base->torqueThreshold;
 }
@@ -856,21 +882,21 @@ void b3DestroyJoint( b3JointId jointId, bool wakeAttached )
 b3JointType b3Joint_GetType( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	return joint->type;
 }
 
 b3BodyId b3Joint_GetBodyA( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	return b3MakeBodyId( world, joint->edges[0].bodyId );
 }
 
 b3BodyId b3Joint_GetBodyB( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	return b3MakeBodyId( world, joint->edges[1].bodyId );
 }
 
@@ -894,7 +920,7 @@ void b3Joint_SetLocalFrameA( b3JointId jointId, b3Transform localFrame )
 b3Transform b3Joint_GetLocalFrameA( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	b3JointSim* jointSim = b3GetJointSim( world, joint );
 	return jointSim->localFrameA;
 }
@@ -913,7 +939,7 @@ void b3Joint_SetLocalFrameB( b3JointId jointId, b3Transform localFrame )
 b3Transform b3Joint_GetLocalFrameB( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	b3JointSim* jointSim = b3GetJointSim( world, joint );
 	return jointSim->localFrameB;
 }
@@ -968,7 +994,7 @@ void b3Joint_SetCollideConnected( b3JointId jointId, bool shouldCollide )
 bool b3Joint_GetCollideConnected( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	return joint->collideConnected;
 }
 
@@ -982,7 +1008,7 @@ void b3Joint_SetUserData( b3JointId jointId, void* userData )
 void* b3Joint_GetUserData( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	return joint->userData;
 }
 
@@ -1011,7 +1037,7 @@ void b3Joint_WakeBodies( b3JointId jointId )
 bool b3Joint_IsAwake( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 
 	// Cheaper than checking if the bodies are awake.
 	return joint->setIndex == b3_awakeSet;
@@ -1209,21 +1235,21 @@ static b3Vec3 b3GetJointConstraintTorque( b3World* world, b3Joint* joint )
 b3Vec3 b3Joint_GetConstraintForce( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	return b3GetJointConstraintForce( world, joint );
 }
 
 b3Vec3 b3Joint_GetConstraintTorque( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	return b3GetJointConstraintTorque( world, joint );
 }
 
 float b3Joint_GetLinearSeparation( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	b3JointSim* base = b3GetJointSim( world, joint );
 
 	b3WorldTransform xfA = b3GetBodyTransform( world, joint->edges[0].bodyId );
@@ -1347,7 +1373,7 @@ float b3Joint_GetLinearSeparation( b3JointId jointId )
 float b3Joint_GetAngularSeparation( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3Joint* joint = b3GetJointFullId( world, jointId );
+	b3Joint* joint = b3ReadJointFullId( world, jointId );
 	b3JointSim* base = b3GetJointSim( world, joint );
 
 	b3WorldTransform xfA = b3GetBodyTransform( world, joint->edges[0].bodyId );

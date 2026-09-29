@@ -228,6 +228,7 @@ typedef struct b3BodySim
 
 // Get a validated body from a world using an id.
 b3Body* b3GetBodyFullId( b3World* world, b3BodyId bodyId );
+b3Body* b3ReadBodyFullId( b3World* world, b3BodyId bodyId );
 
 b3WorldTransform b3GetBodyTransformQuick( b3World* world, b3Body* body );
 b3WorldTransform b3GetBodyTransform( b3World* world, int bodyId );

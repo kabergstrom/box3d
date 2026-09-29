@@ -23,7 +23,7 @@ void b3MotorJoint_SetLinearVelocity( b3JointId jointId, b3Vec3 velocity )
 
 b3Vec3 b3MotorJoint_GetLinearVelocity( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_motorJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_motorJoint );
 	return joint->motorJoint.linearVelocity;
 }
 
@@ -37,7 +37,7 @@ void b3MotorJoint_SetAngularVelocity( b3JointId jointId, b3Vec3 velocity )
 
 b3Vec3 b3MotorJoint_GetAngularVelocity( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_motorJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_motorJoint );
 	return joint->motorJoint.angularVelocity;
 }
 
@@ -51,7 +51,7 @@ void b3MotorJoint_SetMaxVelocityTorque( b3JointId jointId, float maxTorque )
 
 float b3MotorJoint_GetMaxVelocityTorque( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_motorJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_motorJoint );
 	return joint->motorJoint.maxVelocityTorque;
 }
 
@@ -65,7 +65,7 @@ void b3MotorJoint_SetMaxVelocityForce( b3JointId jointId, float maxForce )
 
 float b3MotorJoint_GetMaxVelocityForce( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_motorJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_motorJoint );
 	return joint->motorJoint.maxVelocityForce;
 }
 
@@ -79,7 +79,7 @@ void b3MotorJoint_SetLinearHertz( b3JointId jointId, float hertz )
 
 float b3MotorJoint_GetLinearHertz( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_motorJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_motorJoint );
 	return joint->motorJoint.linearHertz;
 }
 
@@ -93,7 +93,7 @@ void b3MotorJoint_SetLinearDampingRatio( b3JointId jointId, float damping )
 
 float b3MotorJoint_GetLinearDampingRatio( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_motorJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_motorJoint );
 	return joint->motorJoint.linearDampingRatio;
 }
 
@@ -107,7 +107,7 @@ void b3MotorJoint_SetAngularHertz( b3JointId jointId, float hertz )
 
 float b3MotorJoint_GetAngularHertz( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_motorJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_motorJoint );
 	return joint->motorJoint.angularHertz;
 }
 
@@ -121,7 +121,7 @@ void b3MotorJoint_SetAngularDampingRatio( b3JointId jointId, float damping )
 
 float b3MotorJoint_GetAngularDampingRatio( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_motorJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_motorJoint );
 	return joint->motorJoint.angularDampingRatio;
 }
 
@@ -135,7 +135,7 @@ void b3MotorJoint_SetMaxSpringForce( b3JointId jointId, float maxForce )
 
 float b3MotorJoint_GetMaxSpringForce( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_motorJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_motorJoint );
 	return joint->motorJoint.maxSpringForce;
 }
 
@@ -149,7 +149,7 @@ void b3MotorJoint_SetMaxSpringTorque( b3JointId jointId, float maxTorque )
 
 float b3MotorJoint_GetMaxSpringTorque( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_motorJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_motorJoint );
 	return joint->motorJoint.maxSpringTorque;
 }
 

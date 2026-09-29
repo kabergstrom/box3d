@@ -153,3 +153,15 @@ void b3LoadName( b3NameCache* cache, uint32_t id, char* name, int length )
 	b3Array_Push( cache->entries, entry );
 	b3NameMap_insert( map, id, index );
 }
+
+void b3TruncateNames( b3NameCache* cache, int count )
+{
+	b3NameMap* map = cache->map;
+	while ( cache->entries.count > count )
+	{
+		b3NameEntry* entry = cache->entries.data + cache->entries.count - 1;
+		b3NameMap_erase( map, entry->hash );
+		b3Free( entry->name, entry->length + 1 );
+		cache->entries.count -= 1;
+	}
+}

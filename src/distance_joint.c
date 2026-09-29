@@ -27,7 +27,7 @@ void b3DistanceJoint_SetLength( b3JointId jointId, float length )
 
 float b3DistanceJoint_GetLength( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	b3DistanceJoint* joint = &base->distanceJoint;
 	return joint->length;
 }
@@ -43,7 +43,7 @@ void b3DistanceJoint_EnableLimit( b3JointId jointId, bool enableLimit )
 
 bool b3DistanceJoint_IsLimitEnabled( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	return joint->distanceJoint.enableLimit;
 }
 
@@ -65,21 +65,21 @@ void b3DistanceJoint_SetLengthRange( b3JointId jointId, float minLength, float m
 
 float b3DistanceJoint_GetMinLength( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	b3DistanceJoint* joint = &base->distanceJoint;
 	return joint->minLength;
 }
 
 float b3DistanceJoint_GetMaxLength( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	b3DistanceJoint* joint = &base->distanceJoint;
 	return joint->maxLength;
 }
 
 float b3DistanceJoint_GetCurrentLength( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 
 	b3World* world = b3GetUnlockedWorld( jointId.world0 );
 	if ( world == NULL )
@@ -107,7 +107,7 @@ void b3DistanceJoint_EnableSpring( b3JointId jointId, bool enableSpring )
 
 bool b3DistanceJoint_IsSpringEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	return base->distanceJoint.enableSpring;
 }
 
@@ -124,7 +124,7 @@ void b3DistanceJoint_SetSpringForceRange( b3JointId jointId, float lowerForce, f
 
 void b3DistanceJoint_GetSpringForceRange( b3JointId jointId, float* lowerForce, float* upperForce )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	*lowerForce = base->distanceJoint.lowerSpringForce;
 	*upperForce = base->distanceJoint.upperSpringForce;
 }
@@ -147,14 +147,14 @@ void b3DistanceJoint_SetSpringDampingRatio( b3JointId jointId, float dampingRati
 
 float b3DistanceJoint_GetSpringHertz( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	b3DistanceJoint* joint = &base->distanceJoint;
 	return joint->hertz;
 }
 
 float b3DistanceJoint_GetSpringDampingRatio( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	b3DistanceJoint* joint = &base->distanceJoint;
 	return joint->dampingRatio;
 }
@@ -173,7 +173,7 @@ void b3DistanceJoint_EnableMotor( b3JointId jointId, bool enableMotor )
 
 bool b3DistanceJoint_IsMotorEnabled( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	return joint->distanceJoint.enableMotor;
 }
 
@@ -187,14 +187,14 @@ void b3DistanceJoint_SetMotorSpeed( b3JointId jointId, float motorSpeed )
 
 float b3DistanceJoint_GetMotorSpeed( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	return joint->distanceJoint.motorSpeed;
 }
 
 float b3DistanceJoint_GetMotorForce( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	return world->inv_h * base->distanceJoint.motorImpulse;
 }
 
@@ -208,7 +208,7 @@ void b3DistanceJoint_SetMaxMotorForce( b3JointId jointId, float force )
 
 float b3DistanceJoint_GetMaxMotorForce( b3JointId jointId )
 {
-	b3JointSim* joint = b3GetJointSimCheckType( jointId, b3_distanceJoint );
+	b3JointSim* joint = b3ReadJointSimCheckType( jointId, b3_distanceJoint );
 	return joint->distanceJoint.maxMotorForce;
 }
 

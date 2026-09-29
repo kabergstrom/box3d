@@ -27,13 +27,13 @@ void b3SphericalJoint_EnableConeLimit( b3JointId jointId, bool enableLimit )
 
 bool b3SphericalJoint_IsConeLimitEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.enableConeLimit;
 }
 
 float b3SphericalJoint_GetConeLimit( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.coneAngle;
 }
 
@@ -49,7 +49,7 @@ void b3SphericalJoint_SetConeLimit( b3JointId jointId, float angleRadians )
 float b3SphericalJoint_GetConeAngle( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	b3WorldTransform transformA = b3GetBodyTransform( world, base->bodyIdA );
 	b3WorldTransform transformB = b3GetBodyTransform( world, base->bodyIdB );
 
@@ -82,19 +82,19 @@ void b3SphericalJoint_EnableTwistLimit( b3JointId jointId, bool enableLimit )
 
 bool b3SphericalJoint_IsTwistLimitEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.enableTwistLimit;
 }
 
 float b3SphericalJoint_GetLowerTwistLimit( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.lowerTwistAngle;
 }
 
 float b3SphericalJoint_GetUpperTwistLimit( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.upperTwistAngle;
 }
 
@@ -115,7 +115,7 @@ void b3SphericalJoint_SetTwistLimits( b3JointId jointId, float lowerLimitRadians
 float b3SphericalJoint_GetTwistAngle( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	b3WorldTransform transformA = b3GetBodyTransform( world, base->bodyIdA );
 	b3WorldTransform transformB = b3GetBodyTransform( world, base->bodyIdB );
 
@@ -147,7 +147,7 @@ void b3SphericalJoint_EnableSpring( b3JointId jointId, bool enableSpring )
 
 bool b3SphericalJoint_IsSpringEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.enableSpring;
 }
 
@@ -162,7 +162,7 @@ void b3SphericalJoint_SetTargetRotation( b3JointId jointId, b3Quat targetRotatio
 
 b3Quat b3SphericalJoint_GetTargetRotation( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.targetRotation;
 }
 
@@ -177,7 +177,7 @@ void b3SphericalJoint_SetSpringHertz( b3JointId jointId, float hertz )
 
 float b3SphericalJoint_GetSpringHertz( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.hertz;
 }
 
@@ -192,7 +192,7 @@ void b3SphericalJoint_SetSpringDampingRatio( b3JointId jointId, float dampingRat
 
 float b3SphericalJoint_GetSpringDampingRatio( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.dampingRatio;
 }
 
@@ -210,7 +210,7 @@ void b3SphericalJoint_EnableMotor( b3JointId jointId, bool enableMotor )
 
 bool b3SphericalJoint_IsMotorEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.enableMotor;
 }
 
@@ -225,7 +225,7 @@ void b3SphericalJoint_SetMotorVelocity( b3JointId jointId, b3Vec3 motorVelocity 
 
 b3Vec3 b3SphericalJoint_GetMotorVelocity( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.motorVelocity;
 }
 
@@ -240,14 +240,14 @@ void b3SphericalJoint_SetMaxMotorTorque( b3JointId jointId, float maxForce )
 
 float b3SphericalJoint_GetMaxMotorTorque( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return base->sphericalJoint.maxMotorTorque;
 }
 
 b3Vec3 b3SphericalJoint_GetMotorTorque( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_sphericalJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_sphericalJoint );
 	return b3MulSV( world->inv_h, base->sphericalJoint.motorImpulse );
 }
 

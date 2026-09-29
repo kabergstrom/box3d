@@ -24,7 +24,7 @@ void b3ParallelJoint_SetSpringHertz( b3JointId jointId, float hertz )
 
 float b3ParallelJoint_GetSpringHertz( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_parallelJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_parallelJoint );
 	return base->parallelJoint.hertz;
 }
 
@@ -39,7 +39,7 @@ void b3ParallelJoint_SetSpringDampingRatio( b3JointId jointId, float dampingRati
 
 float b3ParallelJoint_GetSpringDampingRatio( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_parallelJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_parallelJoint );
 	return base->parallelJoint.dampingRatio;
 }
 
@@ -54,7 +54,7 @@ void b3ParallelJoint_SetMaxTorque( b3JointId jointId, float maxForce )
 
 float b3ParallelJoint_GetMaxTorque( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_parallelJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_parallelJoint );
 	return base->parallelJoint.maxTorque;
 }
 

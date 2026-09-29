@@ -22,7 +22,7 @@ void b3WeldJoint_SetLinearHertz( b3JointId jointId, float hertz )
 
 float b3WeldJoint_GetLinearHertz( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_weldJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_weldJoint );
 	return base->weldJoint.linearHertz;
 }
 
@@ -37,7 +37,7 @@ void b3WeldJoint_SetLinearDampingRatio( b3JointId jointId, float dampingRatio )
 
 float b3WeldJoint_GetLinearDampingRatio( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_weldJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_weldJoint );
 	return base->weldJoint.linearDampingRatio;
 }
 
@@ -52,7 +52,7 @@ void b3WeldJoint_SetAngularHertz( b3JointId jointId, float hertz )
 
 float b3WeldJoint_GetAngularHertz( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_weldJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_weldJoint );
 	return base->weldJoint.angularHertz;
 }
 
@@ -67,7 +67,7 @@ void b3WeldJoint_SetAngularDampingRatio( b3JointId jointId, float dampingRatio )
 
 float b3WeldJoint_GetAngularDampingRatio( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_weldJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_weldJoint );
 	return base->weldJoint.angularDampingRatio;
 }
 

@@ -66,19 +66,19 @@ void b3PrismaticJoint_EnableLimit( b3JointId jointId, bool enableLimit )
 
 bool b3PrismaticJoint_IsLimitEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return base->prismaticJoint.enableLimit;
 }
 
 float b3PrismaticJoint_GetLowerLimit( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return base->prismaticJoint.lowerTranslation;
 }
 
 float b3PrismaticJoint_GetUpperLimit( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return base->prismaticJoint.upperTranslation;
 }
 
@@ -98,7 +98,7 @@ void b3PrismaticJoint_SetLimits( b3JointId jointId, float lower, float upper )
 float b3PrismaticJoint_GetTranslation( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	b3WorldTransform transformA = b3GetBodyTransform( world, base->bodyIdA );
 	b3WorldTransform transformB = b3GetBodyTransform( world, base->bodyIdB );
 
@@ -126,7 +126,7 @@ void b3PrismaticJoint_EnableSpring( b3JointId jointId, bool enableSpring )
 
 bool b3PrismaticJoint_IsSpringEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return base->prismaticJoint.enableSpring;
 }
 
@@ -141,7 +141,7 @@ void b3PrismaticJoint_SetTargetTranslation( b3JointId jointId, float targetTrans
 
 float b3PrismaticJoint_GetTargetTranslation( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return base->prismaticJoint.targetTranslation;
 }
 
@@ -156,7 +156,7 @@ void b3PrismaticJoint_SetSpringHertz( b3JointId jointId, float hertz )
 
 float b3PrismaticJoint_GetSpringHertz( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return base->prismaticJoint.hertz;
 }
 
@@ -171,7 +171,7 @@ void b3PrismaticJoint_SetSpringDampingRatio( b3JointId jointId, float dampingRat
 
 float b3PrismaticJoint_GetSpringDampingRatio( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return base->prismaticJoint.dampingRatio;
 }
 
@@ -189,7 +189,7 @@ void b3PrismaticJoint_EnableMotor( b3JointId jointId, bool enableMotor )
 
 bool b3PrismaticJoint_IsMotorEnabled( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return base->prismaticJoint.enableMotor;
 }
 
@@ -204,7 +204,7 @@ void b3PrismaticJoint_SetMotorSpeed( b3JointId jointId, float motorSpeed )
 
 float b3PrismaticJoint_GetMotorSpeed( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return base->prismaticJoint.motorSpeed;
 }
 
@@ -219,21 +219,21 @@ void b3PrismaticJoint_SetMaxMotorForce( b3JointId jointId, float maxForce )
 
 float b3PrismaticJoint_GetMaxMotorForce( b3JointId jointId )
 {
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return base->prismaticJoint.maxMotorForce;
 }
 
 float b3PrismaticJoint_GetMotorForce( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 	return world->inv_h * base->prismaticJoint.motorImpulse;
 }
 
 float b3PrismaticJoint_GetSpeed( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
-	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_prismaticJoint );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_prismaticJoint );
 
 	b3Body* bodyA = b3Array_Get( world->bodies, base->bodyIdA );
 	b3Body* bodyB = b3Array_Get( world->bodies, base->bodyIdB );

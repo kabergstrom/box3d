@@ -259,6 +259,73 @@ B3_API void b3World_DumpShapeBounds( b3WorldId worldId, b3BodyType type );
 B3_API void b3World_EnableSpeculative( b3WorldId worldId, bool flag );
 
 /**
+ * @defgroup world_delta World Delta
+ * Incremental in-process world snapshots for rollback. The tracker keeps a mirror of the last captured
+ * state plus one undo log per captured tick. A capture compares only elements that can have changed
+ * (awake bodies and their neighborhood, id pool changes, API marks) and stores the previous bytes of
+ * each changed element. A restore replays undo logs back to the requested tick. Cost scales with the
+ * amount of change, not the world size.
+ * @{
+ */
+
+/// Opaque incremental snapshot tracker. One per world.
+typedef struct b3WorldDelta b3WorldDelta;
+
+/// Capture statistics
+typedef struct b3WorldDeltaStats
+{
+	/// Elements compared by the last capture
+	int comparedCount;
+	/// Elements that changed in the last capture
+	int changedCount;
+	/// Undo bytes stored by the last capture
+	int changedBytes;
+	/// Bytes held in all undo logs
+	int64_t logBytes;
+	/// Bytes held by the mirror
+	int64_t mirrorBytes;
+	/// Changes found by verification that the candidate set missed (verification only)
+	int missCount;
+} b3WorldDeltaStats;
+
+/// Create a tracker and capture the current world state as tick 0. The world must not already have
+/// a tracker. The tracker must be destroyed before the world, or it becomes detached when the world
+/// is destroyed and then only b3DestroyWorldDelta is valid. Host pointers (user data, callbacks and
+/// their contexts) are restored verbatim, so restores are only valid in the capturing process.
+/// @return NULL if the world is locked or already has a tracker
+/// @param maxTicks the rollback window: restorable ticks are [newest - maxTicks, newest]
+B3_API b3WorldDelta* b3CreateWorldDelta( b3WorldId worldId, int maxTicks );
+
+/// Destroy a tracker
+B3_API void b3DestroyWorldDelta( b3WorldDelta* delta );
+
+/// Capture the current world state as the next tick. Call once after each b3World_Step. API changes
+/// made between captures belong to the next capture.
+/// @return the captured tick, or B3_NULL_INDEX if the world is locked or detached
+B3_API int b3WorldDelta_Capture( b3WorldDelta* delta );
+
+/// Restore the world to a previously captured tick. Captured ticks newer than the restored tick are
+/// discarded and the next capture continues from tick + 1.
+/// Refused while the world is recording, since a recording cannot express the rewind.
+/// @return false if the tick is outside the window, the world is locked or recording
+B3_API bool b3WorldDelta_Restore( b3WorldDelta* delta, int tick );
+
+/// Newest captured tick
+B3_API int b3WorldDelta_GetNewestTick( const b3WorldDelta* delta );
+
+/// Oldest restorable tick
+B3_API int b3WorldDelta_GetOldestTick( const b3WorldDelta* delta );
+
+/// Debug: also scan every element on capture and count changes the candidate set missed. Missed
+/// changes are still recorded so restores stay correct. This costs as much as a full snapshot.
+B3_API void b3WorldDelta_EnableVerify( b3WorldDelta* delta, bool flag );
+
+/// Statistics of the last capture
+B3_API b3WorldDeltaStats b3WorldDelta_GetStats( const b3WorldDelta* delta );
+
+/** @} */
+
+/**
  * @defgroup recording Recording
  * @brief Record and replay world state for debugging.
  * @{
