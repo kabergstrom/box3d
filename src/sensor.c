@@ -160,6 +160,7 @@ static bool b3SensorQueryCallback( int proxyId, uint64_t userData, void* context
 	b3Visitor* shapeRef = b3Array_Emplace( sensor->overlaps2 );
 	shapeRef->shapeId = shapeId;
 	shapeRef->generation = otherShape->generation;
+	shapeRef->pad = 0;
 
 	return true;
 }

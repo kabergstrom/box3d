@@ -20,6 +20,9 @@ typedef struct b3Visitor
 {
 	int shapeId;
 	uint16_t generation;
+
+	// Explicit so every byte is written, keeping sensor state bytewise deterministic for snapshots
+	uint16_t pad;
 } b3Visitor;
 
 b3DeclareArray( b3Visitor );
