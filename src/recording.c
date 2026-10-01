@@ -1230,3 +1230,13 @@ uint64_t b3HashWorldState( b3World* world )
 
 	return hash;
 }
+
+uint64_t b3World_GetStateHash( b3WorldId worldId )
+{
+	b3World* world = b3GetUnlockedWorldFromId( worldId );
+	if ( world == NULL )
+	{
+		return 0;
+	}
+	return b3HashWorldState( world );
+}

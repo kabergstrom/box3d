@@ -222,6 +222,11 @@ B3_API bool b3World_IsWarmStartingEnabled( b3WorldId worldId );
 /// Get the number of awake bodies
 B3_API int b3World_GetAwakeBodyCount( b3WorldId worldId );
 
+/// Hash of every body's transform and velocity: the hash recordings store per step. Equal on two
+/// worlds exactly when those are bit-identical, so it detects divergence between runs or peers.
+/// @return 0 if the world is invalid or locked
+B3_API uint64_t b3World_GetStateHash( b3WorldId worldId );
+
 /// Get the current world performance profile
 B3_API b3Profile b3World_GetProfile( b3WorldId worldId );
 
