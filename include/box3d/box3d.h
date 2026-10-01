@@ -222,8 +222,12 @@ B3_API bool b3World_IsWarmStartingEnabled( b3WorldId worldId );
 /// Get the number of awake bodies
 B3_API int b3World_GetAwakeBodyCount( b3WorldId worldId );
 
-/// Hash of every body's transform and velocity: the hash recordings store per step. Equal on two
-/// worlds exactly when those are bit-identical, so it detects divergence between runs or peers.
+/// Divergence hash of the simulation state, for comparing runs or peers (rollback). Covers per live
+/// body: slot index, generation, type, flags, awake/sleeping/disabled, sleep time, mass properties,
+/// damping, gravity scale, pending force and torque, transform and velocity; per live joint: slot
+/// index, generation, type, set, bodies and warm-start impulses. Not covered: shapes, contacts and
+/// their warm-start impulses, islands. Equal states hash equal; a differing hash means divergence.
+/// Not the per-step hash recordings store.
 /// @return 0 if the world is invalid or locked
 B3_API uint64_t b3World_GetStateHash( b3WorldId worldId );
 

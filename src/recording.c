@@ -8,6 +8,8 @@
 #include "recording.h"
 
 #include "body.h"
+#include "joint.h"
+#include "solver_set.h"
 #include "compound.h"
 #include "physics_world.h"
 #include "world_snapshot.h"
@@ -1230,6 +1232,109 @@ uint64_t b3HashWorldState( b3World* world )
 
 	return hash;
 }
+// Divergence hash for rollback and peers, fuller than b3HashWorldState (whose value recordings store, so
+// it stays as is). Hashes per live body slot: index, generation, type, flags, solver set category
+// (static, disabled, awake, sleeping), sleep time, mass properties, damping, gravity scale, pending force
+// and torque, transform and, for awake bodies, velocity. Per live joint slot: index, generation, type,
+// set category, body ids and the warm-start impulses. Not hashed: shapes (their pose follows the body),
+// contacts and their warm-start impulses, islands, the broad-phase.
+typedef struct b3StateHasher
+{
+	uint64_t hash;
+} b3StateHasher;
+
+static void b3HashU32( b3StateHasher* h, uint32_t v )
+{
+	h->hash = ( h->hash ^ (uint64_t)v ) * B3_SNAP_FNV_PRIME;
+}
+
+static void b3HashF32( b3StateHasher* h, float f )
+{
+	uint32_t bits;
+	memcpy( &bits, &f, 4 );
+	b3HashU32( h, bits );
+}
+
+static void b3HashVec3( b3StateHasher* h, b3Vec3 v )
+{
+	b3HashF32( h, v.x );
+	b3HashF32( h, v.y );
+	b3HashF32( h, v.z );
+}
+
+static void b3HashVec2( b3StateHasher* h, b3Vec2 v )
+{
+	b3HashF32( h, v.x );
+	b3HashF32( h, v.y );
+}
+
+static uint32_t b3SetCategory( int setIndex )
+{
+	return (uint32_t)( setIndex < b3_firstSleepingSet ? setIndex : b3_firstSleepingSet );
+}
+
+static void b3HashJointImpulses( b3StateHasher* h, const b3JointSim* sim )
+{
+	switch ( sim->type )
+	{
+		case b3_distanceJoint:
+			b3HashF32( h, sim->distanceJoint.impulse );
+			b3HashF32( h, sim->distanceJoint.lowerImpulse );
+			b3HashF32( h, sim->distanceJoint.upperImpulse );
+			b3HashF32( h, sim->distanceJoint.motorImpulse );
+			break;
+		case b3_motorJoint:
+			b3HashVec3( h, sim->motorJoint.linearVelocityImpulse );
+			b3HashVec3( h, sim->motorJoint.angularVelocityImpulse );
+			b3HashVec3( h, sim->motorJoint.linearSpringImpulse );
+			b3HashVec3( h, sim->motorJoint.angularSpringImpulse );
+			break;
+		case b3_parallelJoint:
+			b3HashVec2( h, sim->parallelJoint.perpImpulse );
+			break;
+		case b3_prismaticJoint:
+			b3HashVec2( h, sim->prismaticJoint.perpImpulse );
+			b3HashVec3( h, sim->prismaticJoint.angularImpulse );
+			b3HashF32( h, sim->prismaticJoint.springImpulse );
+			b3HashF32( h, sim->prismaticJoint.motorImpulse );
+			b3HashF32( h, sim->prismaticJoint.lowerImpulse );
+			b3HashF32( h, sim->prismaticJoint.upperImpulse );
+			break;
+		case b3_revoluteJoint:
+			b3HashVec3( h, sim->revoluteJoint.linearImpulse );
+			b3HashVec2( h, sim->revoluteJoint.perpImpulse );
+			b3HashF32( h, sim->revoluteJoint.springImpulse );
+			b3HashF32( h, sim->revoluteJoint.motorImpulse );
+			b3HashF32( h, sim->revoluteJoint.lowerImpulse );
+			b3HashF32( h, sim->revoluteJoint.upperImpulse );
+			break;
+		case b3_sphericalJoint:
+			b3HashVec3( h, sim->sphericalJoint.linearImpulse );
+			b3HashVec3( h, sim->sphericalJoint.springImpulse );
+			b3HashVec3( h, sim->sphericalJoint.motorImpulse );
+			b3HashF32( h, sim->sphericalJoint.lowerTwistImpulse );
+			b3HashF32( h, sim->sphericalJoint.upperTwistImpulse );
+			b3HashF32( h, sim->sphericalJoint.swingImpulse );
+			break;
+		case b3_weldJoint:
+			b3HashVec3( h, sim->weldJoint.linearImpulse );
+			b3HashVec3( h, sim->weldJoint.angularImpulse );
+			break;
+		case b3_wheelJoint:
+			b3HashVec2( h, sim->wheelJoint.linearImpulse );
+			b3HashVec2( h, sim->wheelJoint.angularImpulse );
+			b3HashF32( h, sim->wheelJoint.spinImpulse );
+			b3HashF32( h, sim->wheelJoint.suspensionSpringImpulse );
+			b3HashF32( h, sim->wheelJoint.lowerSuspensionImpulse );
+			b3HashF32( h, sim->wheelJoint.upperSuspensionImpulse );
+			b3HashF32( h, sim->wheelJoint.steeringSpringImpulse );
+			b3HashF32( h, sim->wheelJoint.lowerSteeringImpulse );
+			b3HashF32( h, sim->wheelJoint.upperSteeringImpulse );
+			break;
+		default:
+			break;
+	}
+}
 
 uint64_t b3World_GetStateHash( b3WorldId worldId )
 {
@@ -1238,5 +1343,68 @@ uint64_t b3World_GetStateHash( b3WorldId worldId )
 	{
 		return 0;
 	}
-	return b3HashWorldState( world );
+
+	b3StateHasher h = { B3_SNAP_FNV_INIT };
+
+	int bodyCount = world->bodies.count;
+	for ( int i = 0; i < bodyCount; ++i )
+	{
+		b3Body* body = world->bodies.data + i;
+		if ( body->id != i )
+		{
+			continue;
+		}
+
+		b3HashU32( &h, (uint32_t)i );
+		b3HashU32( &h, body->generation );
+		b3HashU32( &h, (uint32_t)body->type );
+		b3HashU32( &h, body->flags );
+		b3HashU32( &h, b3SetCategory( body->setIndex ) );
+		b3HashF32( &h, body->sleepTime );
+		b3HashF32( &h, body->mass );
+
+		b3BodySim* sim = b3GetBodySim( world, body );
+		h.hash = b3FnvMixPosition( h.hash, sim->transform.p );
+		b3HashF32( &h, sim->transform.q.v.x );
+		b3HashF32( &h, sim->transform.q.v.y );
+		b3HashF32( &h, sim->transform.q.v.z );
+		b3HashF32( &h, sim->transform.q.s );
+		b3HashU32( &h, sim->flags );
+		b3HashF32( &h, sim->invMass );
+		b3HashVec3( &h, sim->localCenter );
+		b3HashVec3( &h, sim->force );
+		b3HashVec3( &h, sim->torque );
+		b3HashF32( &h, sim->linearDamping );
+		b3HashF32( &h, sim->angularDamping );
+		b3HashF32( &h, sim->gravityScale );
+
+		b3BodyState* state = b3GetBodyState( world, body );
+		if ( state != NULL )
+		{
+			b3HashVec3( &h, state->linearVelocity );
+			b3HashVec3( &h, state->angularVelocity );
+		}
+	}
+
+	int jointCount = world->joints.count;
+	for ( int i = 0; i < jointCount; ++i )
+	{
+		b3Joint* joint = world->joints.data + i;
+		if ( joint->jointId != i )
+		{
+			continue;
+		}
+
+		b3HashU32( &h, (uint32_t)i );
+		b3HashU32( &h, joint->generation );
+		b3HashU32( &h, (uint32_t)joint->type );
+		b3HashU32( &h, b3SetCategory( joint->setIndex ) );
+
+		b3JointSim* sim = b3GetJointSim( world, joint );
+		b3HashU32( &h, (uint32_t)sim->bodyIdA );
+		b3HashU32( &h, (uint32_t)sim->bodyIdB );
+		b3HashJointImpulses( &h, sim );
+	}
+
+	return h.hash;
 }
