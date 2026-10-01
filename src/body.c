@@ -2129,6 +2129,46 @@ float b3Body_GetSleepThreshold( b3BodyId bodyId )
 	return body->sleepThreshold;
 }
 
+void b3Body_SetSleepTime( b3BodyId bodyId, float sleepTime )
+{
+	B3_ASSERT( b3IsValidFloat( sleepTime ) && sleepTime >= 0.0f );
+
+	b3World* world = b3GetUnlockedWorld( bodyId.world0 );
+	if ( world == NULL )
+	{
+		return;
+	}
+
+	B3_REC( world, BodySetSleepTime, bodyId, sleepTime );
+
+	b3Body* body = b3GetBodyFullId( world, bodyId );
+
+	if ( body->setIndex >= b3_firstSleepingSet )
+	{
+		// A sleeping island has rested the full time. Less means the island is awake.
+		if ( sleepTime >= B3_TIME_TO_SLEEP )
+		{
+			return;
+		}
+
+		// Waking resets the sleep time of every body in the set
+		b3WakeBodyWithLock( world, body );
+	}
+
+	// The island sleeps at the end of a step in which every body in it has rested B3_TIME_TO_SLEEP
+	if ( body->setIndex == b3_awakeSet )
+	{
+		body->sleepTime = sleepTime;
+	}
+}
+
+float b3Body_GetSleepTime( b3BodyId bodyId )
+{
+	b3World* world = b3GetWorld( bodyId.world0 );
+	b3Body* body = b3ReadBodyFullId( world, bodyId );
+	return body->sleepTime;
+}
+
 void b3Body_SetSafetyFactor( b3BodyId bodyId, float safetyFactor )
 {
 	B3_ASSERT( b3IsValidFloat( safetyFactor ) && safetyFactor >= 0.0f );

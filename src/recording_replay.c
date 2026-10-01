@@ -956,6 +956,11 @@ static void b3RecDispatch_BodySetSafetyFactor( const b3RecArgs_BodySetSafetyFact
 	b3Body_SetSafetyFactor( b3RecMakeBodyId( rdr, a->body ), a->value );
 }
 
+static void b3RecDispatch_BodySetSleepTime( const b3RecArgs_BodySetSleepTime* a, b3RecReader* rdr )
+{
+	b3Body_SetSleepTime( b3RecMakeBodyId( rdr, a->body ), a->sleepTime );
+}
+
 static void b3RecDispatch_BodyDisable( const b3RecArgs_BodyDisable* a, b3RecReader* rdr )
 {
 	b3Body_Disable( b3RecMakeBodyId( rdr, a->body ) );

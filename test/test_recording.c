@@ -1221,7 +1221,7 @@ static int AllOps( void )
 	b3Shape_SetMeshMaterial( meshShapeId, surfMat, 0 );
 
 	// Body mutators: SetTransform, SetLinearVelocity/AngularVelocity (Vec3), SetName,
-	// damping, gravity scale, sleep threshold, SetAwake, EnableSleep, SetBullet, SetMotionLocks,
+	// damping, gravity scale, sleep threshold, sleep time, SetAwake, EnableSleep, SetBullet, SetMotionLocks,
 	// SetMassData, ApplyMassFromShapes, SetType, SetTargetTransform, Disable/Enable, EnableContactRecycling,
 	// EnableHitEvents, all force/impulse/torque variants
 	b3Body_SetTransform( bodyId, (b3Pos){ 1.0f, 6.0f, 0.0f }, b3Quat_identity );
@@ -1246,6 +1246,7 @@ static int AllOps( void )
 	b3Body_SetType( capsuleBodyId, b3_kinematicBody );
 	b3Body_SetType( capsuleBodyId, b3_dynamicBody );
 	b3Body_SetAwake( bodyId, true );
+	b3Body_SetSleepTime( bodyId, 0.1f );
 
 	// Kinematic body to exercise SetTargetTransform
 	b3BodyDef kinematicDef = b3DefaultBodyDef();

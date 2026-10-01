@@ -517,8 +517,139 @@ static int ForcedSleepAfterDisable( void )
 	return 0;
 }
 
+// A box resting on a box resting on the ground: one island of two bodies.
+static b3WorldId CreateSleepStack( b3BodyId* bodyIds )
+{
+	b3WorldDef worldDef = b3DefaultWorldDef();
+	b3WorldId worldId = b3CreateWorld( &worldDef );
+
+	b3BodyDef groundDef = b3DefaultBodyDef();
+	b3BodyId groundId = b3CreateBody( worldId, &groundDef );
+	b3BoxHull groundBox = b3MakeBoxHull( 10.0f, 0.5f, 10.0f );
+	b3ShapeDef shapeDef = b3DefaultShapeDef();
+	b3CreateHullShape( groundId, &shapeDef, &groundBox.base );
+
+	b3BoxHull box = b3MakeBoxHull( 0.5f, 0.5f, 0.5f );
+	for ( int i = 0; i < 2; ++i )
+	{
+		b3BodyDef bodyDef = b3DefaultBodyDef();
+		bodyDef.type = b3_dynamicBody;
+		bodyDef.position = (b3Pos){ 0.0f, 1.0f + i, 0.0f };
+		bodyIds[i] = b3CreateBody( worldId, &bodyDef );
+		b3CreateHullShape( bodyIds[i], &shapeDef, &box.base );
+	}
+
+	return worldId;
+}
+
+// A replica with the same bodies restarts its sleep timers at lateStep, as a peer that adopted the
+// state late does. From syncStep on it takes the source's sleep times before each step, and the
+// worlds must then hash equal. Writes the number of steps the replica fell asleep after the source.
+static int SleepStepGap( int lateStep, int syncStep, int* gap )
+{
+	b3BodyId sourceIds[2], replicaIds[2];
+	b3WorldId sourceId = CreateSleepStack( sourceIds );
+	b3WorldId replicaId = CreateSleepStack( replicaIds );
+
+	int sourceSleep = -1;
+	int replicaSleep = -1;
+	for ( int step = 0; step < 600 && ( sourceSleep < 0 || replicaSleep < 0 ); ++step )
+	{
+		for ( int i = 0; i < 2; ++i )
+		{
+			if ( step == lateStep )
+			{
+				b3Body_SetSleepTime( replicaIds[i], 0.0f );
+			}
+
+			if ( step >= syncStep )
+			{
+				b3Body_SetSleepTime( replicaIds[i], b3Body_GetSleepTime( sourceIds[i] ) );
+			}
+		}
+
+		b3World_Step( sourceId, 1.0f / 60.0f, 4 );
+		b3World_Step( replicaId, 1.0f / 60.0f, 4 );
+
+		if ( step >= syncStep )
+		{
+			ENSURE( b3World_GetStateHash( sourceId ) == b3World_GetStateHash( replicaId ) );
+		}
+
+		if ( sourceSleep < 0 && b3Body_IsAwake( sourceIds[0] ) == false )
+		{
+			ENSURE( b3Body_IsAwake( sourceIds[1] ) == false );
+			sourceSleep = step;
+		}
+
+		if ( replicaSleep < 0 && b3Body_IsAwake( replicaIds[0] ) == false )
+		{
+			replicaSleep = step;
+		}
+	}
+
+	ENSURE( sourceSleep > lateStep && replicaSleep > lateStep );
+	*gap = replicaSleep - sourceSleep;
+
+	b3DestroyWorld( sourceId );
+	b3DestroyWorld( replicaId );
+	return 0;
+}
+
+// Copying sleep times makes islands fall asleep on the same step, also when the copy starts a few
+// steps before the threshold.
+static int SleepTimeSync( void )
+{
+	int gap = 0;
+	ENSURE( SleepStepGap( 15, INT32_MAX, &gap ) == 0 );
+	ENSURE( gap >= 10 );
+
+	ENSURE( SleepStepGap( 15, 16, &gap ) == 0 );
+	ENSURE( gap == 0 );
+
+	int thresholdStep = (int)( B3_TIME_TO_SLEEP * 60.0f );
+	ENSURE( SleepStepGap( 15, thresholdStep - 3, &gap ) == 0 );
+	ENSURE( gap == 0 );
+	return 0;
+}
+
+// A sleeping body ignores sleep times at the threshold and wakes its island below it. Static bodies
+// ignore sleep times.
+static int SleepTimeOnSleepingBody( void )
+{
+	b3BodyId bodyIds[2];
+	b3WorldId worldId = CreateSleepStack( bodyIds );
+
+	for ( int step = 0; step < 600 && b3Body_IsAwake( bodyIds[0] ); ++step )
+	{
+		b3World_Step( worldId, 1.0f / 60.0f, 4 );
+	}
+
+	ENSURE( b3Body_IsAwake( bodyIds[0] ) == false );
+	ENSURE( b3Body_GetSleepTime( bodyIds[0] ) >= B3_TIME_TO_SLEEP );
+
+	b3Body_SetSleepTime( bodyIds[0], B3_TIME_TO_SLEEP );
+	ENSURE( b3Body_IsAwake( bodyIds[0] ) == false );
+
+	b3Body_SetSleepTime( bodyIds[0], 0.1f );
+	ENSURE( b3Body_IsAwake( bodyIds[0] ) && b3Body_IsAwake( bodyIds[1] ) );
+	ENSURE( b3Body_GetSleepTime( bodyIds[0] ) == 0.1f );
+	ENSURE( b3Body_GetSleepTime( bodyIds[1] ) == 0.0f );
+
+	b3BodyDef staticDef = b3DefaultBodyDef();
+	staticDef.position = (b3Pos){ 20.0f, 0.0f, 0.0f };
+	b3BodyId staticId = b3CreateBody( worldId, &staticDef );
+	b3Body_SetSleepTime( staticId, 0.2f );
+	ENSURE( b3Body_GetSleepTime( staticId ) == 0.0f );
+
+	b3DestroyWorld( worldId );
+	return 0;
+}
+
 int BodyTest( void )
 {
+	RUN_SUBTEST( SleepTimeSync );
+	RUN_SUBTEST( SleepTimeOnSleepingBody );
 	RUN_SUBTEST( ForcedSleepAfterDisable );
 	RUN_SUBTEST( FarSingleSphereMass );
 	RUN_SUBTEST( FarCubeSphereMass );

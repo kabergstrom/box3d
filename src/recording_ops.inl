@@ -72,6 +72,7 @@ B3_REC_OP( 0x38, BodyEnableContactRecycling, RET_NONE, ARG( BODYID, body ) ARG( 
 B3_REC_OP( 0x39, BodyEnableHitEvents, RET_NONE, ARG( BODYID, body ) ARG( BOOL, flag ) )
 B3_REC_OP( 0x3A, BodyAllowFastRotation, RET_NONE, ARG( BODYID, body ) ARG( BOOL, flag ) )
 B3_REC_OP( 0x3B, BodySetSafetyFactor, RET_NONE, ARG( BODYID, body ) ARG( F32, value ) )
+B3_REC_OP( 0x3C, BodySetSleepTime, RET_NONE, ARG( BODYID, body ) ARG( F32, sleepTime ) )
 
 // Shape create/destroy
 B3_REC_OP( 0x40, CreateSphereShape, RET_SHAPEID, ARG( BODYID, body ) ARG( SHAPEDEF, def ) ARG( SPHERE, sphere ) )
