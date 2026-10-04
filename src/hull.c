@@ -2350,6 +2350,33 @@ b3HullData* b3CloneHull( const b3HullData* hull )
 	return clone;
 }
 
+b3HullData* b3CopyHullBytes( const void* bytes, int byteCount )
+{
+	if ( bytes == NULL || byteCount < (int)sizeof( b3HullData ) )
+	{
+		return NULL;
+	}
+
+	// memcpy: the bytes may be unaligned
+	int32_t storedCount;
+	memcpy( &storedCount, (const uint8_t*)bytes + offsetof( b3HullData, byteCount ), sizeof( storedCount ) );
+	if ( storedCount != byteCount )
+	{
+		return NULL;
+	}
+
+	b3HullData* hull = b3Alloc( byteCount );
+	memcpy( hull, bytes, byteCount );
+	return hull;
+}
+
+uint64_t b3UpdateHullHash( b3HullData* hull )
+{
+	hull->hash = 0;
+	hull->hash = b3Hash64NonZero( (uint8_t*)hull, hull->byteCount );
+	return hull->hash;
+}
+
 uint64_t b3HashHullData( const b3HullData* hull )
 {
 	return hull->hash;

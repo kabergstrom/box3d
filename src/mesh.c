@@ -11,6 +11,7 @@
 #include "box3d/collision.h"
 #include "box3d/constants.h"
 
+#include <stddef.h>
 #include <stdint.h>
 
 b3DeclareArray( b3VertexNode );
@@ -1832,6 +1833,33 @@ b3MeshData* b3CreateMesh( const b3MeshDef* def, int* degenerateTriangleIndices, 
 void b3DestroyMesh( b3MeshData* mesh )
 {
 	b3Free( mesh, mesh->byteCount );
+}
+
+b3MeshData* b3CopyMeshBytes( const void* bytes, int byteCount )
+{
+	if ( bytes == NULL || byteCount < (int)sizeof( b3MeshData ) )
+	{
+		return NULL;
+	}
+
+	// memcpy: the bytes may be unaligned
+	int32_t storedCount;
+	memcpy( &storedCount, (const uint8_t*)bytes + offsetof( b3MeshData, byteCount ), sizeof( storedCount ) );
+	if ( storedCount != byteCount )
+	{
+		return NULL;
+	}
+
+	b3MeshData* mesh = b3Alloc( byteCount );
+	memcpy( mesh, bytes, byteCount );
+	return mesh;
+}
+
+uint64_t b3UpdateMeshHash( b3MeshData* mesh )
+{
+	mesh->hash = 0;
+	mesh->hash = b3Hash64NonZero( (uint8_t*)mesh, mesh->byteCount );
+	return mesh->hash;
 }
 
 bool b3OverlapMesh( const b3Mesh* shape, b3Transform shapeTransform, const b3ShapeProxy* proxy )

@@ -237,6 +237,15 @@ B3_API b3HullData* b3CloneAndTransformHull( const b3HullData* original, b3Transf
 /// Destroy a hull.
 B3_API void b3DestroyHull( b3HullData* hull );
 
+/// Copy serialized hull bytes (a hull's `byteCount` bytes, as built) into a new hull. The bytes may be
+/// unaligned. Only the size is checked: NULL if byteCount is below sizeof( b3HullData ) or differs from
+/// the blob's byteCount field. The caller validates the copy before use and frees it with b3DestroyHull.
+B3_API b3HullData* b3CopyHullBytes( const void* bytes, int byteCount );
+
+/// Recompute and store a hull's content hash, as the builders compute it (over its byteCount bytes
+/// with the hash field zero). Returns it. Checks a loaded hull against the hash it was saved with.
+B3_API uint64_t b3UpdateHullHash( b3HullData* hull );
+
 /// Make a cube as a hull. Do not call b3DestroyHull on this.
 B3_API b3BoxHull b3MakeCubeHull( float halfWidth );
 
@@ -360,6 +369,15 @@ B3_API b3MeshData* b3CreateMesh( const b3MeshDef* def, int* degenerateTriangleIn
 
 /// Destroy a mesh.
 B3_API void b3DestroyMesh( b3MeshData* mesh );
+
+/// Copy serialized mesh bytes (a mesh's `byteCount` bytes, as built) into a new mesh. The bytes may be
+/// unaligned. Only the size is checked: NULL if byteCount is below sizeof( b3MeshData ) or differs from
+/// the blob's byteCount field. The caller validates the copy before use and frees it with b3DestroyMesh.
+B3_API b3MeshData* b3CopyMeshBytes( const void* bytes, int byteCount );
+
+/// Recompute and store a mesh's content hash, as the builders compute it (over its byteCount bytes
+/// with the hash field zero). Returns it. Checks a loaded mesh against the hash it was saved with.
+B3_API uint64_t b3UpdateMeshHash( b3MeshData* mesh );
 
 /// Get the height of the mesh BVH.
 B3_API int b3GetHeight( const b3MeshData* mesh );
