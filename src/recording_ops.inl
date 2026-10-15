@@ -237,3 +237,9 @@ B3_REC_OP( 0xF1, StateHash, RET_NONE, ARG( WORLDID, world ) ARG( U64, hash ) )
 
 // Accumulated world bounds over the whole recording, written once at stop.
 B3_REC_OP( 0xF2, RecordingBounds, RET_NONE, ARG( AABB, bounds ) )
+
+// Rope joint
+B3_REC_OP( 0xF3, CreateRopeJoint, RET_JOINTID, ARG( WORLDID, world ) ARG( ROPEJOINTDEF, def ) )
+B3_REC_OP( 0xF4, RopeJointSetLength, RET_NONE, ARG( JOINTID, joint ) ARG( F32, length ) )
+B3_REC_OP( 0xF5, RopeJointSetStiffness, RET_NONE, ARG( JOINTID, joint ) ARG( F32, stiffness ) )
+B3_REC_OP( 0xF6, RopeJointSetDampingRatio, RET_NONE, ARG( JOINTID, joint ) ARG( F32, dampingRatio ) )

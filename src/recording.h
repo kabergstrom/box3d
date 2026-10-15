@@ -53,7 +53,8 @@ typedef struct b3World b3World;
 // Minor tracks op-stream additions that keep the 48 byte header shape.
 // Minor version 7 made the contact body sim locators persistent
 // Minor version 9 added the body sleep time op
-#define B3_REC_VERSION_MINOR 9
+// Minor version 10 added the rope joint ops
+#define B3_REC_VERSION_MINOR 10
 
 // File header, fixed 48 bytes. Contains the registry locator so the player
 // can load geometry before replaying any ops.
@@ -197,6 +198,7 @@ typedef b3RevoluteJointDef b3RecCType_REVOLUTEJOINTDEF;
 typedef b3SphericalJointDef b3RecCType_SPHERICALJOINTDEF;
 typedef b3WeldJointDef b3RecCType_WELDJOINTDEF;
 typedef b3WheelJointDef b3RecCType_WHEELJOINTDEF;
+typedef b3RopeJointDef b3RecCType_ROPEJOINTDEF;
 
 // Codegen pass 1a: arg structs. Generated here so call sites (body.c, shape.c, etc.) can see them.
 #define ARG( TAG, field ) b3RecCType_##TAG field;
@@ -267,6 +269,7 @@ void b3RecW_REVOLUTEJOINTDEF( b3RecBuffer* buf, b3RevoluteJointDef v );
 void b3RecW_SPHERICALJOINTDEF( b3RecBuffer* buf, b3SphericalJointDef v );
 void b3RecW_WELDJOINTDEF( b3RecBuffer* buf, b3WeldJointDef v );
 void b3RecW_WHEELJOINTDEF( b3RecBuffer* buf, b3WheelJointDef v );
+void b3RecW_ROPEJOINTDEF( b3RecBuffer* buf, b3RopeJointDef v );
 
 // Record framing
 void b3RecBeginRecord( b3Recording* rec, uint8_t opcode );

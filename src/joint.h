@@ -304,6 +304,30 @@ typedef struct b3WheelJoint
 	bool enableSteeringMotor;
 } b3WheelJoint;
 
+typedef struct b3RopeJoint
+{
+	// Points local to their body's origin; bit i of bodyBMask: point i is on body B
+	b3Vec3 localPoints[B3_MAX_ROPE_POINTS];
+	int pointCount;
+	uint32_t bodyBMask;
+
+	float length;
+	float stiffness;
+	float dampingRatio;
+
+	// Tension impulse (non-negative)
+	float impulse;
+
+	// Solver temporaries: points relative to their body's center of mass in world space
+	// at the start of the step, the centers' separation and the soft tuning
+	int indexA;
+	int indexB;
+	b3Vec3 anchors[B3_MAX_ROPE_POINTS];
+	b3Vec3 deltaCenter;
+	b3Softness softness;
+	bool soft;
+} b3RopeJoint;
+
 /// The base joint class. Joints are used to constraint two bodies together in
 /// various fashions. Some joints also feature limits and motors.
 typedef struct b3JointSim
@@ -342,6 +366,7 @@ typedef struct b3JointSim
 		b3PrismaticJoint prismaticJoint;
 		b3WeldJoint weldJoint;
 		b3WheelJoint wheelJoint;
+		b3RopeJoint ropeJoint;
 	};
 } b3JointSim;
 
@@ -372,6 +397,7 @@ b3Vec3 b3GetRevoluteJointForce( b3World* world, b3JointSim* base );
 b3Vec3 b3GetSphericalJointForce( b3World* world, b3JointSim* base );
 b3Vec3 b3GetWeldJointForce( b3World* world, b3JointSim* base );
 b3Vec3 b3GetWheelJointForce( b3World* world, b3JointSim* base );
+b3Vec3 b3GetRopeJointForce( b3World* world, b3JointSim* base );
 
 b3Vec3 b3GetMotorJointTorque( b3World* world, b3JointSim* base );
 b3Vec3 b3GetParallelJointTorque( b3World* world, b3JointSim* base );
@@ -389,6 +415,7 @@ void b3PrepareRevoluteJoint( b3JointSim* base, b3StepContext* context );
 void b3PrepareSphericalJoint( b3JointSim* base, b3StepContext* context );
 void b3PrepareWeldJoint( b3JointSim* base, b3StepContext* context );
 void b3PrepareWheelJoint( b3JointSim* base, b3StepContext* context );
+void b3PrepareRopeJoint( b3JointSim* base, b3StepContext* context );
 
 void b3WarmStartDistanceJoint( b3JointSim* base, b3StepContext* context );
 void b3WarmStartMotorJoint( b3JointSim* base, b3StepContext* context );
@@ -398,6 +425,7 @@ void b3WarmStartRevoluteJoint( b3JointSim* base, b3StepContext* context );
 void b3WarmStartSphericalJoint( b3JointSim* base, b3StepContext* context );
 void b3WarmStartWeldJoint( b3JointSim* base, b3StepContext* context );
 void b3WarmStartWheelJoint( b3JointSim* base, b3StepContext* context );
+void b3WarmStartRopeJoint( b3JointSim* base, b3StepContext* context );
 
 void b3SolveDistanceJoint( b3JointSim* base, b3StepContext* context, bool useBias );
 void b3SolveMotorJoint( b3JointSim* base, b3StepContext* context );
@@ -407,6 +435,7 @@ void b3SolveRevoluteJoint( b3JointSim* base, b3StepContext* context, bool useBia
 void b3SolveSphericalJoint( b3JointSim* base, b3StepContext* context, bool useBias );
 void b3SolveWeldJoint( b3JointSim* base, b3StepContext* context, bool useBias );
 void b3SolveWheelJoint( b3JointSim* base, b3StepContext* context, bool useBias );
+void b3SolveRopeJoint( b3JointSim* base, b3StepContext* context, bool useBias );
 
 void b3DrawDistanceJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB );
 void b3DrawParallelJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB, float scale );
@@ -415,3 +444,5 @@ void b3DrawRevoluteJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform 
 void b3DrawSphericalJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB, float scale );
 void b3DrawWeldJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB, float scale );
 void b3DrawWheelJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB, float scale );
+void b3DrawRopeJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB );
+float b3GetRopeJointLength( b3World* world, b3JointSim* base );

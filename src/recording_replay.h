@@ -247,6 +247,7 @@ b3RevoluteJointDef b3RecR_REVOLUTEJOINTDEF( b3RecReader* rdr );
 b3SphericalJointDef b3RecR_SPHERICALJOINTDEF( b3RecReader* rdr );
 b3WeldJointDef b3RecR_WELDJOINTDEF( b3RecReader* rdr );
 b3WheelJointDef b3RecR_WHEELJOINTDEF( b3RecReader* rdr );
+b3RopeJointDef b3RecR_ROPEJOINTDEF( b3RecReader* rdr );
 b3QueryFilter b3RecR_QUERYFILTER( b3RecReader* rdr );
 b3ShapeProxy b3RecR_SHAPEPROXY( b3RecReader* rdr );
 b3TreeStats b3RecR_TREESTATS( b3RecReader* rdr );

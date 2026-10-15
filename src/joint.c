@@ -111,6 +111,17 @@ b3WheelJointDef b3DefaultWheelJointDef( void )
 	return def;
 }
 
+b3RopeJointDef b3DefaultRopeJointDef( void )
+{
+	b3RopeJointDef def = { 0 };
+	def.base = b3DefaultJointDef();
+	def.pointCount = 2;
+	def.bodyBMask = 2u;
+	def.length = 1.0f;
+	def.dampingRatio = 1.0f;
+	return def;
+}
+
 b3ExplosionDef b3DefaultExplosionDef( void )
 {
 	b3ExplosionDef def = { 0 };
@@ -505,6 +516,47 @@ b3JointId b3CreateDistanceJoint( b3WorldId worldId, const b3DistanceJointDef* de
 
 	b3JointId jointId = { joint->jointId + 1, world->worldId, pair.joint->generation };
 	B3_REC_CREATE( world, CreateDistanceJoint, jointId, worldId, *def );
+	return jointId;
+}
+
+b3JointId b3CreateRopeJoint( b3WorldId worldId, const b3RopeJointDef* def )
+{
+	B3_CHECK_JOINT_DEF( def );
+	b3World* world = b3GetUnlockedWorldFromId( worldId );
+	if ( world == NULL )
+	{
+		return (b3JointId){ 0 };
+	}
+
+	B3_ASSERT( 2 <= def->pointCount && def->pointCount <= B3_MAX_ROPE_POINTS );
+	B3_ASSERT( b3IsValidFloat( def->length ) && def->length > 0.0f );
+
+	// The base frames sit at the ends (generic joint queries and drawing).
+	b3JointDef jointDef = def->base;
+	int count = b3ClampInt( def->pointCount, 2, B3_MAX_ROPE_POINTS );
+	b3Vec3 first = def->localPoints[0];
+	b3Vec3 last = def->localPoints[count - 1];
+	jointDef.localFrameA = (b3Transform){ ( def->bodyBMask & 1u ) ? b3Vec3_zero : first, b3Quat_identity };
+	jointDef.localFrameB = (b3Transform){ ( def->bodyBMask >> ( count - 1 ) ) & 1u ? last : b3Vec3_zero, b3Quat_identity };
+
+	b3JointPair pair = b3CreateJoint( world, &jointDef, b3_ropeJoint );
+
+	b3JointSim* joint = pair.jointSim;
+
+	joint->ropeJoint = (b3RopeJoint){ 0 };
+	for ( int i = 0; i < count; ++i )
+	{
+		joint->ropeJoint.localPoints[i] = def->localPoints[i];
+	}
+	joint->ropeJoint.pointCount = count;
+	joint->ropeJoint.bodyBMask = def->bodyBMask & ( ( 1u << count ) - 1u );
+	joint->ropeJoint.length = b3ClampFloat( def->length, B3_LINEAR_SLOP, B3_HUGE );
+	joint->ropeJoint.stiffness = b3MaxFloat( def->stiffness, 0.0f );
+	joint->ropeJoint.dampingRatio = b3MaxFloat( def->dampingRatio, 0.0f );
+	joint->ropeJoint.impulse = 0.0f;
+
+	b3JointId jointId = { joint->jointId + 1, world->worldId, pair.joint->generation };
+	B3_REC_CREATE( world, CreateRopeJoint, jointId, worldId, *def );
 	return jointId;
 }
 
@@ -1146,6 +1198,10 @@ void b3GetJointReaction( b3World* world, b3JointSim* sim, float invTimeStep, flo
 		}
 		break;
 
+		case b3_ropeJoint:
+			linearImpulse = sim->ropeJoint.impulse;
+			break;
+
 		default:
 			break;
 	}
@@ -1187,6 +1243,9 @@ static b3Vec3 b3GetJointConstraintForce( b3World* world, b3Joint* joint )
 		case b3_wheelJoint:
 			return b3GetWheelJointForce( world, base );
 
+		case b3_ropeJoint:
+			return b3GetRopeJointForce( world, base );
+
 		default:
 			B3_ASSERT( false );
 			return b3Vec3_zero;
@@ -1225,6 +1284,9 @@ static b3Vec3 b3GetJointConstraintTorque( b3World* world, b3Joint* joint )
 
 		case b3_wheelJoint:
 			return b3GetWheelJointTorque( world, base );
+
+		case b3_ropeJoint:
+			return b3Vec3_zero;
 
 		default:
 			B3_ASSERT( false );
@@ -1320,6 +1382,12 @@ float b3Joint_GetLinearSeparation( b3JointId jointId )
 			}
 
 			return sqrtf( perpendicularSeparation * perpendicularSeparation + limitSeparation * limitSeparation );
+		}
+
+		case b3_ropeJoint:
+		{
+			b3RopeJoint* ropeJoint = &base->ropeJoint;
+			return b3MaxFloat( 0.0f, b3GetRopeJointLength( world, base ) - ropeJoint->length );
 		}
 
 		case b3_revoluteJoint:
@@ -1460,6 +1528,9 @@ float b3Joint_GetAngularSeparation( b3JointId jointId )
 			B3_ASSERT( false );
 			return 0.0f;
 
+		case b3_ropeJoint:
+			return 0.0f;
+
 		default:
 			B3_ASSERT( false );
 			return 0.0f;
@@ -1548,6 +1619,10 @@ void b3PrepareJoint( b3JointSim* joint, b3StepContext* context )
 			b3PrepareWheelJoint( joint, context );
 			break;
 
+		case b3_ropeJoint:
+			b3PrepareRopeJoint( joint, context );
+			break;
+
 		default:
 			B3_ASSERT( false );
 	}
@@ -1590,6 +1665,10 @@ void b3WarmStartJoint( b3JointSim* joint, b3StepContext* context )
 
 		case b3_wheelJoint:
 			b3WarmStartWheelJoint( joint, context );
+			break;
+
+		case b3_ropeJoint:
+			b3WarmStartRopeJoint( joint, context );
 			break;
 
 		default:
@@ -1636,6 +1715,10 @@ void b3SolveJoint( b3JointSim* joint, b3StepContext* context, bool useBias )
 
 		case b3_wheelJoint:
 			b3SolveWheelJoint( joint, context, useBias );
+			break;
+
+		case b3_ropeJoint:
+			b3SolveRopeJoint( joint, context, useBias );
 			break;
 
 		default:
@@ -1752,6 +1835,10 @@ void b3DrawJoint( b3DebugDraw* draw, b3World* world, b3Joint* joint )
 
 		case b3_wheelJoint:
 			b3DrawWheelJoint( draw, jointSim, transformA, transformB, scale );
+			break;
+
+		case b3_ropeJoint:
+			b3DrawRopeJoint( draw, jointSim, transformA, transformB );
 			break;
 
 		default:

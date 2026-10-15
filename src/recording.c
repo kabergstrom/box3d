@@ -344,6 +344,8 @@ _Static_assert( sizeof( void* ) != 8 || sizeof( b3WeldJointDef ) == 128,
 				"b3WeldJointDef changed: update b3RecW_WELDJOINTDEF and its reader together" );
 _Static_assert( sizeof( void* ) != 8 || sizeof( b3WheelJointDef ) == 184,
 				"b3WheelJointDef changed: update b3RecW_WHEELJOINTDEF and its reader together" );
+_Static_assert( sizeof( void* ) != 8 || sizeof( b3RopeJointDef ) == 232,
+				"b3RopeJointDef changed: update b3RecW_ROPEJOINTDEF and its reader together" );
 
 void b3RecW_EXPLOSIONDEF( b3RecBuffer* buf, b3ExplosionDef v )
 {
@@ -526,6 +528,20 @@ void b3RecW_WELDJOINTDEF( b3RecBuffer* buf, b3WeldJointDef v )
 	b3RecW_F32( buf, v.angularHertz );
 	b3RecW_F32( buf, v.linearDampingRatio );
 	b3RecW_F32( buf, v.angularDampingRatio );
+}
+
+void b3RecW_ROPEJOINTDEF( b3RecBuffer* buf, b3RopeJointDef v )
+{
+	b3RecW_JointBase( buf, &v.base );
+	b3RecW_I32( buf, v.pointCount );
+	for ( int i = 0; i < B3_MAX_ROPE_POINTS; ++i )
+	{
+		b3RecW_VEC3( buf, v.localPoints[i] );
+	}
+	b3RecW_U32( buf, v.bodyBMask );
+	b3RecW_F32( buf, v.length );
+	b3RecW_F32( buf, v.stiffness );
+	b3RecW_F32( buf, v.dampingRatio );
 }
 
 void b3RecW_WHEELJOINTDEF( b3RecBuffer* buf, b3WheelJointDef v )
@@ -1319,6 +1335,10 @@ static void b3HashJointImpulses( b3StateHasher* h, const b3JointSim* sim )
 		case b3_weldJoint:
 			b3HashVec3( h, sim->weldJoint.linearImpulse );
 			b3HashVec3( h, sim->weldJoint.angularImpulse );
+			break;
+		case b3_ropeJoint:
+			b3HashF32( h, sim->ropeJoint.impulse );
+			b3HashF32( h, sim->ropeJoint.length );
 			break;
 		case b3_wheelJoint:
 			b3HashVec2( h, sim->wheelJoint.linearImpulse );

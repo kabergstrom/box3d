@@ -70,6 +70,7 @@ set(BOX3D_SOURCE_FILES
 	world_snapshot.c
 	world_snapshot.h
 	revolute_joint.c
+	rope_joint.c
 	scheduler.c
 	scheduler.h
 	sensor.c

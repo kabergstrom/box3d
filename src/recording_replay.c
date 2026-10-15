@@ -625,6 +625,22 @@ b3WeldJointDef b3RecR_WELDJOINTDEF( b3RecReader* rdr )
 	return def;
 }
 
+b3RopeJointDef b3RecR_ROPEJOINTDEF( b3RecReader* rdr )
+{
+	b3RopeJointDef def = b3DefaultRopeJointDef();
+	b3RecR_JointBase( rdr, &def.base );
+	def.pointCount = b3RecR_I32( rdr );
+	for ( int i = 0; i < B3_MAX_ROPE_POINTS; ++i )
+	{
+		def.localPoints[i] = b3RecR_VEC3( rdr );
+	}
+	def.bodyBMask = b3RecR_U32( rdr );
+	def.length = b3RecR_F32( rdr );
+	def.stiffness = b3RecR_F32( rdr );
+	def.dampingRatio = b3RecR_F32( rdr );
+	return def;
+}
+
 b3WheelJointDef b3RecR_WHEELJOINTDEF( b3RecReader* rdr )
 {
 	b3WheelJointDef def = b3DefaultWheelJointDef();
@@ -1289,6 +1305,30 @@ static void b3RecDispatch_CreateWheelJoint( const b3RecArgs_CreateWheelJoint* a,
 	def.base.bodyIdA = b3RecMakeBodyId( rdr, def.base.bodyIdA );
 	def.base.bodyIdB = b3RecMakeBodyId( rdr, def.base.bodyIdB );
 	b3RecCheckJointId( rdr, b3CreateWheelJoint( rdr->replayWorldId, &def ), recId );
+}
+
+static void b3RecDispatch_CreateRopeJoint( const b3RecArgs_CreateRopeJoint* a, b3RecReader* rdr )
+{
+	b3JointId recId = b3RecR_JOINTID( rdr );
+	b3RopeJointDef def = a->def;
+	def.base.bodyIdA = b3RecMakeBodyId( rdr, def.base.bodyIdA );
+	def.base.bodyIdB = b3RecMakeBodyId( rdr, def.base.bodyIdB );
+	b3RecCheckJointId( rdr, b3CreateRopeJoint( rdr->replayWorldId, &def ), recId );
+}
+
+static void b3RecDispatch_RopeJointSetLength( const b3RecArgs_RopeJointSetLength* a, b3RecReader* rdr )
+{
+	b3RopeJoint_SetLength( b3RecMakeJointId( rdr, a->joint ), a->length );
+}
+
+static void b3RecDispatch_RopeJointSetStiffness( const b3RecArgs_RopeJointSetStiffness* a, b3RecReader* rdr )
+{
+	b3RopeJoint_SetStiffness( b3RecMakeJointId( rdr, a->joint ), a->stiffness );
+}
+
+static void b3RecDispatch_RopeJointSetDampingRatio( const b3RecArgs_RopeJointSetDampingRatio* a, b3RecReader* rdr )
+{
+	b3RopeJoint_SetDampingRatio( b3RecMakeJointId( rdr, a->joint ), a->dampingRatio );
 }
 
 static void b3RecDispatch_DestroyJoint( const b3RecArgs_DestroyJoint* a, b3RecReader* rdr )

@@ -624,6 +624,7 @@ typedef enum b3JointType
 	b3_sphericalJoint,
 	b3_weldJoint,
 	b3_wheelJoint,
+	b3_ropeJoint,
 } b3JointType;
 
 /// Base joint definition used by all joint types. The local frames are measured from the
@@ -1032,6 +1033,46 @@ typedef struct b3WheelJointDef
 /// Use this to initialize your joint definition
 /// @ingroup wheel_joint
 B3_API b3WheelJointDef b3DefaultWheelJointDef( void );
+
+/// The most points a rope joint's path holds (both ends included).
+/// @ingroup rope_joint
+#define B3_MAX_ROPE_POINTS 8
+
+/// Rope joint definition. A rope runs along a path of points, each fixed on body A or
+/// body B: end, then any points it passes through (sheaves, pulleys, the edges of a
+/// lashed crate), then the other end. It slides freely through the inner points, so
+/// every segment carries the same tension, and it only pulls: the constraint keeps the
+/// path's total length at most `length`. A static body stands in for the world.
+/// The base frames are unused (the points carry the attachments).
+/// @ingroup rope_joint
+typedef struct b3RopeJointDef
+{
+	/// Base joint definition
+	b3JointDef base;
+
+	/// Points along the path, local to their body's origin.
+	b3Vec3 localPoints[B3_MAX_ROPE_POINTS];
+
+	/// Number of points used, 2 to B3_MAX_ROPE_POINTS.
+	int pointCount;
+
+	/// Bit i set: point i is on body B, else on body A.
+	uint32_t bodyBMask;
+
+	/// Rope length: the most the path may measure. Clamped to a stable minimum value.
+	float length;
+
+	/// Axial stiffness EA (newtons per unit strain): stretching the rope by x pulls with
+	/// EA x / length, so longer ropes are stretchier. Zero makes the rope inextensible.
+	float stiffness;
+
+	/// Damping ratio of the stretch, non-dimensional. Applies when stiffness is non-zero.
+	float dampingRatio;
+} b3RopeJointDef;
+
+/// Use this to initialize your joint definition
+/// @ingroup rope_joint
+B3_API b3RopeJointDef b3DefaultRopeJointDef( void );
 
 /// The explosion definition is used to configure options for explosions. Explosions
 /// consider shape geometry when computing the impulse.

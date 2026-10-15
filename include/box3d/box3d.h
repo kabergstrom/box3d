@@ -1863,6 +1863,51 @@ B3_API float b3WheelJoint_GetSteeringTorque( b3JointId jointId );
 
 /**@}*/ // wheel_joint
 
+/**
+ * @defgroup rope_joint Rope Joint
+ * A rope along a path of points on two bodies: its ends and the points it runs through
+ * (sheaves, pulleys, edges it is lashed over). It slides through the inner points, so
+ * every segment pulls with the same tension, and it only pulls (slack: no force). Taut,
+ * it stretches with its axial stiffness. Winch or ratchet it by setting its length.
+ * @{
+ */
+
+/// Create a rope joint.
+/// @see b3RopeJointDef for details.
+B3_API b3JointId b3CreateRopeJoint( b3WorldId worldId, const b3RopeJointDef* def );
+
+/// Set the rope length (the most the path may measure). Keeps the tension built up.
+B3_API void b3RopeJoint_SetLength( b3JointId jointId, float length );
+
+/// Get the rope length.
+B3_API float b3RopeJoint_GetLength( b3JointId jointId );
+
+/// Set the axial stiffness EA (newtons per unit strain; zero: inextensible).
+B3_API void b3RopeJoint_SetStiffness( b3JointId jointId, float stiffness );
+
+/// Get the axial stiffness.
+B3_API float b3RopeJoint_GetStiffness( b3JointId jointId );
+
+/// Set the damping ratio of the stretch.
+B3_API void b3RopeJoint_SetDampingRatio( b3JointId jointId, float dampingRatio );
+
+/// Get the damping ratio.
+B3_API float b3RopeJoint_GetDampingRatio( b3JointId jointId );
+
+/// The path's current length (the sum of its segments).
+B3_API float b3RopeJoint_GetCurrentLength( b3JointId jointId );
+
+/// The rope's tension in newtons (the same in every segment; zero while slack).
+B3_API float b3RopeJoint_GetTension( b3JointId jointId );
+
+/// The number of points of the path.
+B3_API int b3RopeJoint_GetPointCount( b3JointId jointId );
+
+/// The path's points in world space, at most `capacity`. Returns the number written.
+B3_API int b3RopeJoint_GetWorldPoints( b3JointId jointId, b3Pos* points, int capacity );
+
+/**@}*/ // rope_joint
+
 /**@}*/ // joint
 
 /**
