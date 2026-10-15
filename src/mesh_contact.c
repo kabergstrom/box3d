@@ -1097,6 +1097,8 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 	{
 		float friction = 0.0f;
 		float restitution = 0.0f;
+		float stiffness = 0.0f;
+		float dampingRatio = 0.0f;
 		float sampleCount = 0.0f;
 
 		const uint8_t* materialIndices;
@@ -1138,6 +1140,11 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 				restitution += world->restitutionCallback( material.restitution, material.userMaterialId, materialB->restitution,
 														   materialB->userMaterialId );
 
+				float sampleStiffness, sampleDampingRatio;
+				b3MixContactSpring( &material, materialB, &sampleStiffness, &sampleDampingRatio );
+				stiffness += sampleStiffness;
+				dampingRatio = b3MaxFloat( dampingRatio, sampleDampingRatio );
+
 				tangentVelocityA = b3Add( tangentVelocityA, material.tangentVelocity );
 
 				sampleCount += 1.0f;
@@ -1149,6 +1156,8 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 			float invCount = 1.0f / sampleCount;
 			contact->friction = invCount * friction;
 			contact->restitution = invCount * restitution;
+			contact->contactStiffness = invCount * stiffness;
+			contact->contactDampingRatio = dampingRatio;
 			tangentVelocityA = b3MulSV( invCount, tangentVelocityA );
 		}
 
@@ -1162,6 +1171,7 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 													 materialB->userMaterialId );
 		contact->restitution = world->restitutionCallback( materialsA[0].restitution, materialsA[0].userMaterialId,
 														   materialB->restitution, materialB->userMaterialId );
+		b3MixContactSpring( materialsA + 0, materialB, &contact->contactStiffness, &contact->contactDampingRatio );
 		tangentVelocityA = materialsA[0].tangentVelocity;
 	}
 

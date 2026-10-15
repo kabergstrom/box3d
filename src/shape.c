@@ -271,6 +271,8 @@ static b3ShapeId b3CreateShape( b3BodyId bodyId, const b3ShapeDef* def, const vo
 	B3_ASSERT( b3IsValidFloat( def->density ) && def->density >= 0.0f );
 	B3_ASSERT( b3IsValidFloat( def->baseMaterial.friction ) && def->baseMaterial.friction >= 0.0f );
 	B3_ASSERT( b3IsValidFloat( def->baseMaterial.restitution ) && def->baseMaterial.restitution >= 0.0f );
+	B3_ASSERT( b3IsValidFloat( def->baseMaterial.contactStiffness ) && def->baseMaterial.contactStiffness >= 0.0f );
+	B3_ASSERT( b3IsValidFloat( def->baseMaterial.contactDampingRatio ) && def->baseMaterial.contactDampingRatio >= 0.0f );
 
 	b3World* world = b3GetUnlockedWorld( bodyId.world0 );
 	if ( world == NULL )
@@ -1291,6 +1293,8 @@ void b3Shape_SetSurfaceMaterial( b3ShapeId shapeId, b3SurfaceMaterial surfaceMat
 	B3_ASSERT( b3IsValidFloat( surfaceMaterial.restitution ) && surfaceMaterial.restitution >= 0.0f );
 	B3_ASSERT( b3IsValidFloat( surfaceMaterial.rollingResistance ) && surfaceMaterial.rollingResistance >= 0.0f );
 	B3_ASSERT( b3IsValidVec3( surfaceMaterial.tangentVelocity ) );
+	B3_ASSERT( b3IsValidFloat( surfaceMaterial.contactStiffness ) && surfaceMaterial.contactStiffness >= 0.0f );
+	B3_ASSERT( b3IsValidFloat( surfaceMaterial.contactDampingRatio ) && surfaceMaterial.contactDampingRatio >= 0.0f );
 
 	b3World* world = b3GetWorld( shapeId.world0 );
 	B3_REC( world, ShapeSetSurfaceMaterial, shapeId, surfaceMaterial );
@@ -1319,6 +1323,8 @@ void b3Shape_SetMeshMaterial( b3ShapeId shapeId, b3SurfaceMaterial surfaceMateri
 	B3_ASSERT( b3IsValidFloat( surfaceMaterial.restitution ) && surfaceMaterial.restitution >= 0.0f );
 	B3_ASSERT( b3IsValidFloat( surfaceMaterial.rollingResistance ) && surfaceMaterial.rollingResistance >= 0.0f );
 	B3_ASSERT( b3IsValidVec3( surfaceMaterial.tangentVelocity ) );
+	B3_ASSERT( b3IsValidFloat( surfaceMaterial.contactStiffness ) && surfaceMaterial.contactStiffness >= 0.0f );
+	B3_ASSERT( b3IsValidFloat( surfaceMaterial.contactDampingRatio ) && surfaceMaterial.contactDampingRatio >= 0.0f );
 
 	b3World* world = b3GetWorld( shapeId.world0 );
 	b3Shape* shape = b3GetShape( world, shapeId );

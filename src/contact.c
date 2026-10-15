@@ -650,6 +650,7 @@ static bool b3UpdateConvexContact( b3World* world, int workerIndex, b3Contact* c
 		world->frictionCallback( materialA->friction, materialA->userMaterialId, materialB->friction, materialB->userMaterialId );
 	contact->restitution = world->restitutionCallback( materialA->restitution, materialA->userMaterialId, materialB->restitution,
 													   materialB->userMaterialId );
+	b3MixContactSpring( materialA, materialB, &contact->contactStiffness, &contact->contactDampingRatio );
 
 	if ( materialA->rollingResistance > 0.0f || materialB->rollingResistance > 0.0f )
 	{

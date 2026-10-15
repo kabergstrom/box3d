@@ -275,6 +275,8 @@ void b3RecW_MATERIAL( b3RecBuffer* buf, b3SurfaceMaterial v )
 	b3RecW_VEC3( buf, v.tangentVelocity );
 	b3RecW_U64( buf, v.userMaterialId );
 	b3RecW_U32( buf, v.customColor );
+	b3RecW_F32( buf, v.contactStiffness );
+	b3RecW_F32( buf, v.contactDampingRatio );
 }
 
 void b3RecW_MASSDATA( b3RecBuffer* buf, b3MassData v )
@@ -324,7 +326,8 @@ _Static_assert( sizeof( void* ) != 8 || sizeof( b3ExplosionDef ) == 32 || sizeof
 				"b3ExplosionDef changed: update b3RecW_EXPLOSIONDEF and b3RecR_EXPLOSIONDEF together" );
 _Static_assert( sizeof( void* ) != 8 || sizeof( b3BodyDef ) == 112 || sizeof( b3BodyDef ) == 128,
 				"b3BodyDef changed: update b3RecW_BODYDEF and b3RecR_BODYDEF together" );
-_Static_assert( sizeof( void* ) != 8 || sizeof( b3ShapeDef ) == 120,
+_Static_assert( sizeof( b3SurfaceMaterial ) == 48, "b3SurfaceMaterial changed: update b3RecW_MATERIAL and b3RecR_MATERIAL together" );
+_Static_assert( sizeof( void* ) != 8 || sizeof( b3ShapeDef ) == 128,
 				"b3ShapeDef changed: update b3RecW_SHAPEDEF and b3RecR_SHAPEDEF together" );
 _Static_assert( sizeof( void* ) != 8 || sizeof( b3ParallelJointDef ) == 128,
 				"b3ParallelJointDef changed: update b3RecW_PARALLELJOINTDEF and its reader together" );

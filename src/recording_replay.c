@@ -351,6 +351,8 @@ b3SurfaceMaterial b3RecR_MATERIAL( b3RecReader* rdr )
 	m.tangentVelocity = b3RecR_VEC3( rdr );
 	m.userMaterialId = b3RecR_U64( rdr );
 	m.customColor = b3RecR_U32( rdr );
+	m.contactStiffness = b3RecR_F32( rdr );
+	m.contactDampingRatio = b3RecR_F32( rdr );
 	return m;
 }
 

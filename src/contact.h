@@ -156,6 +156,10 @@ typedef struct b3Contact
 	float rollingResistance;
 	b3Vec3 tangentVelocity;
 
+	// Mixed contact spring (N/m, whole contact) and its damping ratio. Zero stiffness is rigid.
+	float contactStiffness;
+	float contactDampingRatio;
+
 	// This is monotonically advanced when a contact is allocated in this slot
 	// Used to check for invalid b3ContactId
 	uint32_t generation;
@@ -176,6 +180,34 @@ void b3InitializeContactRegisters( void );
 
 void b3CreateContact( b3World* world, b3Shape* shapeA, b3Shape* shapeB, int childIndex );
 void b3DestroyContact( b3World* world, b3Contact* contact, bool wakeBodies );
+
+// Springs in series when both are soft, otherwise the soft one. Damping: the larger ratio of the soft shapes.
+static inline void b3MixContactSpring( const b3SurfaceMaterial* materialA, const b3SurfaceMaterial* materialB, float* stiffness,
+									   float* dampingRatio )
+{
+	float kA = materialA->contactStiffness;
+	float kB = materialB->contactStiffness;
+	if ( kA > 0.0f && kB > 0.0f )
+	{
+		*stiffness = kA * kB / ( kA + kB );
+		*dampingRatio = b3MaxFloat( materialA->contactDampingRatio, materialB->contactDampingRatio );
+	}
+	else if ( kA > 0.0f )
+	{
+		*stiffness = kA;
+		*dampingRatio = materialA->contactDampingRatio;
+	}
+	else if ( kB > 0.0f )
+	{
+		*stiffness = kB;
+		*dampingRatio = materialB->contactDampingRatio;
+	}
+	else
+	{
+		*stiffness = 0.0f;
+		*dampingRatio = 0.0f;
+	}
+}
 
 bool b3UpdateContact( b3World* world, int workerIndex, b3Contact* contact, b3Shape* shapeA, b3Vec3 localCenterA, b3WorldTransform xfA,
 					  b3Shape* shapeB, b3Vec3 localCenterB, b3WorldTransform xfB, bool isFast, b3Arena arena );

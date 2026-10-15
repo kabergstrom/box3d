@@ -26,6 +26,16 @@
 // s(t) = s0 + dot(cB0 - cA0, normal) + dot(dpB - dpA + rot(dqB, rB0) - rot(dqA, rA0), normal)
 // s_base = s0 + dot(cB0 - cA0, normal)
 
+// Contact spring. The material stiffness (N/m) is for the whole contact, so it is split evenly over the
+// points, and each point's share becomes a frequency from that point's own normal effective mass:
+// omega = sqrt(k / m) = sqrt(k * invMass). This keeps the spring physical: the overlap of a light body
+// pressed by a heavy one is load / stiffness, not mushy because the light body sets the effective mass.
+static b3Softness b3MakeContactSpring( float pointStiffness, float invNormalMass, float dampingRatio, float h )
+{
+	float omega = sqrtf( pointStiffness * invNormalMass );
+	return b3MakeSoft( omega * ( 0.5f / B3_PI ), dampingRatio, h );
+}
+
 // Prepare a mesh constraints
 void b3PrepareContacts_Mesh( b3SolverBlock block, b3StepContext* context )
 {
@@ -172,6 +182,20 @@ void b3PrepareContacts_Mesh( b3SolverBlock block, b3StepContext* context )
 			b3ManifoldConstraint* manifoldConstraints = manifoldBase + specs[localIndex].manifoldStart;
 			contactConstraint->constraints = manifoldConstraints;
 
+			// The contact spring is shared by all points of all manifolds.
+			float contactStiffness = contact->contactStiffness;
+			float contactDampingRatio = contact->contactDampingRatio;
+			float pointStiffness = 0.0f;
+			if ( contactStiffness > 0.0f )
+			{
+				int totalPointCount = 0;
+				for ( int manifoldIndex = 0; manifoldIndex < manifoldCount; ++manifoldIndex )
+				{
+					totalPointCount += contact->manifolds[manifoldIndex].pointCount;
+				}
+				pointStiffness = totalPointCount > 0 ? contactStiffness / (float)totalPointCount : 0.0f;
+			}
+
 			for ( int manifoldIndex = 0; manifoldIndex < manifoldCount; ++manifoldIndex )
 			{
 				b3Manifold* manifold = contact->manifolds + manifoldIndex;
@@ -216,6 +240,17 @@ void b3PrepareContacts_Mesh( b3SolverBlock block, b3StepContext* context )
 					b3Vec3 rnB = b3Cross( rB, normal );
 					float kNormal = mA + mB + b3Dot( rnA, b3MulMV( iA, rnA ) ) + b3Dot( rnB, b3MulMV( iB, rnB ) );
 					cp->normalMass = kNormal > 0.0f ? 1.0f / kNormal : 0.0f;
+
+					if ( pointStiffness > 0.0f && kNormal > 0.0f )
+					{
+						cp->spring = b3MakeContactSpring( pointStiffness, kNormal, contactDampingRatio, context->h );
+						cp->soft = true;
+					}
+					else
+					{
+						cp->spring = ( b3Softness ){ 0 };
+						cp->soft = false;
+					}
 
 					// Only compute the normal velocity terms if needed.
 					if ( sampleVelocity )
@@ -462,7 +497,24 @@ void b3PushContacts_Mesh( b3SolverBlock block, b3StepContext* context )
 				float velocityBias;
 				float massScale;
 				float impulseScale;
-				if ( s > 0.0f )
+				if ( cp->soft )
+				{
+					// Contact spring: no speculative margin and no push-out speed cap. Slack when separated, so
+					// the impulse is released. Overlapped, the spring's own bias holds the overlap at load / k.
+					if ( s > 0.0f )
+					{
+						velocityBias = 0.0f;
+						massScale = 0.0f;
+						impulseScale = 1.0f;
+					}
+					else
+					{
+						velocityBias = cp->spring.massScale * cp->spring.biasRate * s;
+						massScale = cp->spring.massScale;
+						impulseScale = cp->spring.impulseScale;
+					}
+				}
+				else if ( s > 0.0f )
 				{
 					// speculative bias is positive
 					velocityBias = s * inv_h;
@@ -590,7 +642,26 @@ void b3SolveContacts_Mesh( b3SolverBlock block, b3StepContext* context )
 				float vn = b3Dot( b3Sub( vrB, vrA ), normal );
 
 				// incremental normal impulse
-				float deltaImpulse = -cp->normalMass * ( vn + velocityBias );
+				float deltaImpulse;
+				if ( cp->soft )
+				{
+					// A spring is physical, not a position correction, so it keeps its bias in the relax pass
+					// too (like joint springs). Slack when separated.
+					if ( s > 0.0f )
+					{
+						deltaImpulse = -cp->normalImpulse;
+					}
+					else
+					{
+						b3Softness spring = cp->spring;
+						deltaImpulse = -cp->normalMass * ( spring.massScale * vn + spring.massScale * spring.biasRate * s ) -
+									   spring.impulseScale * cp->normalImpulse;
+					}
+				}
+				else
+				{
+					deltaImpulse = -cp->normalMass * ( vn + velocityBias );
+				}
 
 				// clamp the accumulated impulse
 				float newImpulse = b3MaxFloat( cp->normalImpulse + deltaImpulse, 0.0f );
@@ -763,6 +834,12 @@ void b3ApplyRestitution_Mesh( b3SolverBlock block, b3StepContext* context )
 			for ( int pointIndex = 0; pointIndex < pointCount; ++pointIndex )
 			{
 				b3ManifoldConstraintPoint* cp = constraint->points + pointIndex;
+
+				// The contact spring has its own damping and no restitution.
+				if ( cp->soft )
+				{
+					continue;
+				}
 
 				b3Vec3 rA = cp->rA;
 				b3Vec3 rB = cp->rB;
@@ -1083,6 +1160,13 @@ typedef struct b3ContactConstraintPointWide
 	b3FloatW leverArms;
 	b3FloatW relativeVelocities;
 	b3FloatW restitutionImpulses;
+
+	// Contact spring, only written and read when the wide constraint has a soft lane (anySoft).
+	// Lanes with softMasks set are springs. The bias rate is premultiplied by the mass scale.
+	b3FloatW springBiasRates;
+	b3FloatW springMassScales;
+	b3FloatW springImpulseScales;
+	b3FloatW softMasks;
 } b3ContactConstraintPointWide;
 
 // Solves four points
@@ -1093,6 +1177,9 @@ typedef struct b3ContactConstraintWide
 	int indexB[B3_SIMD_WIDTH];
 
 	int pointCounts[B3_SIMD_WIDTH];
+
+	// True if any lane is a contact spring. Rigid constraints skip the spring math.
+	int anySoft;
 
 	b3FloatW invMassA, invMassB;
 	b3SymMatrix3W invIA, invIB;
@@ -1474,6 +1561,17 @@ void b3PrepareContacts_Convex( b3SolverBlock block, b3StepContext* context )
 			B3_GATHER_LANES( c->friction, contactLanes, friction );
 			B3_GATHER_LANES( c->rollingResistance, contactLanes, rollingResistance );
 			B3_GATHER_LANES( c->restitution, contactLanes, restitution );
+
+			// Contact springs, see b3MakeContactSpring. Empty lanes use the zero contact (rigid).
+			float stiffnessLanes[B3_SIMD_WIDTH];
+			float dampingRatioLanes[B3_SIMD_WIDTH];
+			c->anySoft = 0;
+			for ( int lane = 0; lane < B3_SIMD_WIDTH; ++lane )
+			{
+				stiffnessLanes[lane] = contactLanes[lane]->contactStiffness;
+				dampingRatioLanes[lane] = contactLanes[lane]->contactDampingRatio;
+				c->anySoft |= stiffnessLanes[lane] > 0.0f ? 1 : 0;
+			}
 			B3_GATHER_LANES( tangentVelocity.X, contactLanes, tangentVelocity.x );
 			B3_GATHER_LANES( tangentVelocity.Y, contactLanes, tangentVelocity.y );
 			B3_GATHER_LANES( tangentVelocity.Z, contactLanes, tangentVelocity.z );
@@ -1564,6 +1662,43 @@ void b3PrepareContacts_Convex( b3SolverBlock block, b3StepContext* context )
 				kNormal = b3AddW( kNormal, b3DotW( rnB, b3MulMVW( iB, rnB ) ) );
 				b3FloatW valid = b3AndW( b3GreaterThanW( kNormal, zeroW ), pointMask );
 				cp->normalMasses = b3BlendW( zeroW, b3DivW( oneW, kNormal ), valid );
+
+				if ( c->anySoft )
+				{
+					float invMassLanes[B3_SIMD_WIDTH];
+					float biasRateLanes[B3_SIMD_WIDTH];
+					float massScaleLanes[B3_SIMD_WIDTH];
+					float impulseScaleLanes[B3_SIMD_WIDTH];
+					float softLanes[B3_SIMD_WIDTH];
+					b3StoreW( invMassLanes, kNormal );
+
+					for ( int lane = 0; lane < B3_SIMD_WIDTH; ++lane )
+					{
+						int lanePointCount = c->pointCounts[lane];
+						if ( pointIndex < lanePointCount && stiffnessLanes[lane] > 0.0f && invMassLanes[lane] > 0.0f )
+						{
+							float pointStiffness = stiffnessLanes[lane] / (float)lanePointCount;
+							b3Softness spring =
+								b3MakeContactSpring( pointStiffness, invMassLanes[lane], dampingRatioLanes[lane], context->h );
+							biasRateLanes[lane] = spring.massScale * spring.biasRate;
+							massScaleLanes[lane] = spring.massScale;
+							impulseScaleLanes[lane] = spring.impulseScale;
+							softLanes[lane] = 1.0f;
+						}
+						else
+						{
+							biasRateLanes[lane] = 0.0f;
+							massScaleLanes[lane] = 0.0f;
+							impulseScaleLanes[lane] = 0.0f;
+							softLanes[lane] = 0.0f;
+						}
+					}
+
+					cp->springBiasRates = b3LoadW( biasRateLanes );
+					cp->springMassScales = b3LoadW( massScaleLanes );
+					cp->springImpulseScales = b3LoadW( impulseScaleLanes );
+					cp->softMasks = b3GreaterThanW( b3LoadW( softLanes ), zeroW );
+				}
 			}
 
 			b3FloatW invWeight =
@@ -1796,6 +1931,19 @@ void b3PushContacts_Convex( b3SolverBlock block, b3StepContext* context )
 			b3FloatW pointMassScale = b3BlendW( massScale, oneW, separated );
 			b3FloatW pointImpulseScale = b3BlendW( impulseScale, b3ZeroW(), separated );
 
+			if ( c->anySoft )
+			{
+				// Contact spring: no speculative margin and no push-out speed cap. Slack when separated
+				// (mass scale 0 and impulse scale 1 release the impulse). See b3PushContacts_Mesh.
+				b3FloatW soft = cp->softMasks;
+				b3FloatW springBias = b3BlendW( b3MulW( cp->springBiasRates, s ), b3ZeroW(), separated );
+				b3FloatW springMassScale = b3BlendW( cp->springMassScales, b3ZeroW(), separated );
+				b3FloatW springImpulseScale = b3BlendW( cp->springImpulseScales, oneW, separated );
+				velocityBias = b3BlendW( velocityBias, springBias, soft );
+				pointMassScale = b3BlendW( pointMassScale, springMassScale, soft );
+				pointImpulseScale = b3BlendW( pointImpulseScale, springImpulseScale, soft );
+			}
+
 			// Relative velocity at contact
 			b3Vec3W vrA = b3AddVW( bA.v, b3CrossW( bA.w, rA ) );
 			b3Vec3W vrB = b3AddVW( bB.v, b3CrossW( bB.w, rB ) );
@@ -1878,6 +2026,18 @@ void b3SolveContacts_Convex( b3SolverBlock block, b3StepContext* context )
 
 			// Compute normal impulse
 			b3FloatW negImpulse = b3MulW( cp->normalMasses, b3AddW( vn, velocityBias ) );
+
+			if ( c->anySoft )
+			{
+				// A spring keeps its bias in the relax pass too. Slack when separated. See b3SolveContacts_Mesh.
+				b3FloatW separated = b3GreaterThanW( s, b3ZeroW() );
+				b3FloatW springBias = b3BlendW( b3MulW( cp->springBiasRates, s ), b3ZeroW(), separated );
+				b3FloatW springMassScale = b3BlendW( cp->springMassScales, b3ZeroW(), separated );
+				b3FloatW springImpulseScale = b3BlendW( cp->springImpulseScales, oneW, separated );
+				b3FloatW springImpulse = b3AddW( b3MulW( cp->normalMasses, b3AddW( b3MulW( springMassScale, vn ), springBias ) ),
+												  b3MulW( springImpulseScale, cp->normalImpulses ) );
+				negImpulse = b3BlendW( negImpulse, springImpulse, cp->softMasks );
+			}
 
 			// Clamp the accumulated impulse
 			b3FloatW newImpulse = b3MaxW( b3SubW( cp->normalImpulses, negImpulse ), b3ZeroW() );
@@ -2047,6 +2207,12 @@ void b3ApplyRestitution_Convex( b3SolverBlock block, b3StepContext* context )
 			b3Vec3W rB = cp->anchorBs;
 
 			b3FloatW normalMass = propagate ? cp->normalMasses : b3BlendW( zeroW, cp->normalMasses, restitutionMask );
+
+			// The contact spring has its own damping and no restitution.
+			if ( c->anySoft )
+			{
+				normalMass = b3BlendW( normalMass, zeroW, cp->softMasks );
+			}
 
 			b3FloatW compressionImpulse = b3SubW( cp->totalNormalImpulses, cp->restitutionImpulses );
 			b3FloatW armed = b3AndW( b3AndW( restitutionMask, b3LessThanW( cp->relativeVelocities, negRestitutionThreshold ) ),

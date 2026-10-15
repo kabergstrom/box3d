@@ -63,6 +63,7 @@ b3SurfaceMaterial b3DefaultSurfaceMaterial( void )
 {
 	b3SurfaceMaterial surfaceMaterial = { 0 };
 	surfaceMaterial.friction = 0.6f;
+	surfaceMaterial.contactDampingRatio = 1.0f;
 	return surfaceMaterial;
 }
 

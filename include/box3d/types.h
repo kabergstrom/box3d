@@ -435,6 +435,19 @@ typedef struct b3SurfaceMaterial
 	/// @see b3HexColor
 	uint32_t customColor;
 
+	/// Physical contact stiffness in newtons per meter (N/m), for the contact as a whole: the total
+	/// normal spring across all of its points. Zero (the default) is a rigid contact that uses the
+	/// world contact softness. When positive the contact is a spring-damper: a resting body overlaps
+	/// by load / stiffness. The spring is converted to a per point softness from each point's normal
+	/// effective mass, so the overlap depends on the load and not on the masses of the bodies.
+	/// Two soft shapes act as springs in series: kA * kB / (kA + kB). One soft shape: its stiffness.
+	/// Soft contacts have no speculative margin, no push-out speed cap and no restitution.
+	float contactStiffness;
+
+	/// Damping ratio of the contact spring, non-dimensional. 1 is critically damped. Only used
+	/// when contactStiffness is positive. A soft pair uses the larger ratio of its soft shapes.
+	float contactDampingRatio;
+
 	/// Explicit padding. Must be zero.
 	uint32_t padding;
 } b3SurfaceMaterial;
@@ -2521,8 +2534,8 @@ typedef struct b3CompoundDef
 	int sphereCount;
 } b3CompoundDef;
 
-/// The baked compound version depends on the tree, mesh, and hull versions.
-#define B3_COMPOUND_VERSION ( 0x7A2F41C9E6D0B358ull ^ B3_DYNAMIC_TREE_VERSION ^ B3_MESH_VERSION ^ B3_HULL_VERSION )
+/// The baked compound version depends on the tree, mesh, and hull versions and the material layout.
+#define B3_COMPOUND_VERSION ( 0x7A2F41C9E6D0B359ull ^ B3_DYNAMIC_TREE_VERSION ^ B3_MESH_VERSION ^ B3_HULL_VERSION )
 
 /// The data for a baked compound shape. This is a potentially large yet highly optimized
 /// data structure. It can contain thousands of child shapes, yet at runtime it populates

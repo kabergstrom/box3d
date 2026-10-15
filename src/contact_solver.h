@@ -16,6 +16,9 @@ typedef struct b3ManifoldConstraintPoint
 	float restitutionImpulse;
 	float normalMass;
 	float leverArm;
+	// Contact spring softness from the material stiffness and this point's effective mass. Only used if soft.
+	b3Softness spring;
+	bool soft;
 } b3ManifoldConstraintPoint;
 
 typedef struct b3ManifoldConstraint
