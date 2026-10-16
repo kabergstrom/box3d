@@ -1053,9 +1053,12 @@ B3_API b3WheelJointDef b3DefaultWheelJointDef( void );
 
 /// Rope joint definition. A rope runs along a path of points, each fixed on body A or
 /// body B: end, then any points it passes through (sheaves, pulleys, the edges of a
-/// lashed crate), then the other end. It slides freely through the inner points, so
-/// every segment carries the same tension, and it only pulls: the constraint keeps the
-/// path's total length at most `length`. A static body stands in for the world.
+/// lashed crate), then the other end. It slides through the inner points, and it only
+/// pulls: the constraint keeps the path's total length at most `length`. Without friction
+/// every segment carries the same tension. With friction at an inner point the rope grips
+/// it (capstan friction): it holds there until one side pulls more than e^(friction * wrap)
+/// times the other, wrap being the angle the path turns through at the point, and slips
+/// past that, losing energy as it goes. A static body stands in for the world.
 /// The base frames are unused (the points carry the attachments).
 /// @ingroup rope_joint
 typedef struct b3RopeJointDef
@@ -1081,6 +1084,10 @@ typedef struct b3RopeJointDef
 
 	/// Damping ratio of the stretch, non-dimensional. Applies when stiffness is non-zero.
 	float dampingRatio;
+
+	/// Friction coefficient between the rope and each point it passes through (zero:
+	/// free; about 0.25 for rope on iron, 0.4 on wood or rope). The ends' are unused.
+	float friction[B3_MAX_ROPE_POINTS];
 } b3RopeJointDef;
 
 /// Use this to initialize your joint definition

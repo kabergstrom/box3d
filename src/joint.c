@@ -548,6 +548,12 @@ b3JointId b3CreateRopeJoint( b3WorldId worldId, const b3RopeJointDef* def )
 	{
 		joint->ropeJoint.localPoints[i] = def->localPoints[i];
 	}
+	// Only inner points grip.
+	for ( int i = 1; i + 1 < count; ++i )
+	{
+		float friction = def->friction[i];
+		joint->ropeJoint.friction[i] = b3IsValidFloat( friction ) ? b3MaxFloat( friction, 0.0f ) : 0.0f;
+	}
 	joint->ropeJoint.pointCount = count;
 	joint->ropeJoint.bodyBMask = def->bodyBMask & ( ( 1u << count ) - 1u );
 	joint->ropeJoint.length = b3ClampFloat( def->length, B3_LINEAR_SLOP, B3_HUGE );
@@ -1199,7 +1205,7 @@ void b3GetJointReaction( b3World* world, b3JointSim* sim, float invTimeStep, flo
 		break;
 
 		case b3_ropeJoint:
-			linearImpulse = sim->ropeJoint.impulse;
+			linearImpulse = b3GetRopeJointMaxImpulse( &sim->ropeJoint );
 			break;
 
 		default:

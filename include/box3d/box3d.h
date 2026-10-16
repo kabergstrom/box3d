@@ -1866,9 +1866,11 @@ B3_API float b3WheelJoint_GetSteeringTorque( b3JointId jointId );
 /**
  * @defgroup rope_joint Rope Joint
  * A rope along a path of points on two bodies: its ends and the points it runs through
- * (sheaves, pulleys, edges it is lashed over). It slides through the inner points, so
- * every segment pulls with the same tension, and it only pulls (slack: no force). Taut,
- * it stretches with its axial stiffness. Winch or ratchet it by setting its length.
+ * (sheaves, pulleys, edges it is lashed over). It slides through the inner points, held
+ * by each one's friction (capstan: the segments either side differ in tension by at most
+ * e^(friction * wrap)); without friction every segment pulls with the same tension. It
+ * only pulls (slack: no force). Taut, it stretches with its axial stiffness. Winch or
+ * ratchet it by setting its length.
  * @{
  */
 
@@ -1897,8 +1899,17 @@ B3_API float b3RopeJoint_GetDampingRatio( b3JointId jointId );
 /// The path's current length (the sum of its segments).
 B3_API float b3RopeJoint_GetCurrentLength( b3JointId jointId );
 
-/// The rope's tension in newtons (the same in every segment; zero while slack).
+/// The rope's tension in newtons: its most loaded segment's (every segment's, without
+/// friction; zero while slack).
 B3_API float b3RopeJoint_GetTension( b3JointId jointId );
+
+/// Each segment's tension in newtons, end to end, at most `capacity`. Returns the number
+/// written (the point count less one).
+B3_API int b3RopeJoint_GetSegmentTensions( b3JointId jointId, float* tensions, int capacity );
+
+/// The energy friction took where the rope slipped over each point during the last
+/// step, in joules, at most `capacity` (the ends' are zero). Returns the number written.
+B3_API int b3RopeJoint_GetSlipEnergies( b3JointId jointId, float* energies, int capacity );
 
 /// The number of points of the path.
 B3_API int b3RopeJoint_GetPointCount( b3JointId jointId );

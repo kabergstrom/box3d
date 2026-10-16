@@ -92,11 +92,64 @@ float b3RopeJoint_GetCurrentLength( b3JointId jointId )
 	return b3GetRopeJointLength( world, base );
 }
 
+// Segment i's tension impulse: the last segment's plus the friction impulses of the inner
+// points after segment i.
+static float b3RopeSegmentImpulse( const b3RopeJoint* joint, int segment )
+{
+	float impulse = joint->impulse;
+	for ( int k = segment + 1; k + 1 < joint->pointCount; ++k )
+	{
+		impulse += joint->frictionImpulse[k];
+	}
+	return impulse;
+}
+
+float b3GetRopeJointMaxImpulse( const b3RopeJoint* joint )
+{
+	float most = 0.0f;
+	for ( int i = 0; i + 1 < joint->pointCount; ++i )
+	{
+		most = b3MaxFloat( most, b3RopeSegmentImpulse( joint, i ) );
+	}
+	return most;
+}
+
 float b3RopeJoint_GetTension( b3JointId jointId )
 {
 	b3World* world = b3GetWorld( jointId.world0 );
 	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_ropeJoint );
-	return world->inv_h * base->ropeJoint.impulse;
+	return world->inv_h * b3GetRopeJointMaxImpulse( &base->ropeJoint );
+}
+
+int b3RopeJoint_GetSegmentTensions( b3JointId jointId, float* tensions, int capacity )
+{
+	b3World* world = b3GetWorld( jointId.world0 );
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_ropeJoint );
+	if ( tensions == NULL )
+	{
+		return 0;
+	}
+	int count = 0;
+	for ( ; count + 1 < base->ropeJoint.pointCount && count < capacity; ++count )
+	{
+		tensions[count] = world->inv_h * b3RopeSegmentImpulse( &base->ropeJoint, count );
+	}
+	return count;
+}
+
+int b3RopeJoint_GetSlipEnergies( b3JointId jointId, float* energies, int capacity )
+{
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_ropeJoint );
+	if ( energies == NULL )
+	{
+		return 0;
+	}
+	int count = base->ropeJoint.pointCount < capacity ? base->ropeJoint.pointCount : capacity;
+	for ( int i = 0; i < count; ++i )
+	{
+		energies[i] = base->ropeJoint.slipEnergy[i];
+	}
+	return count;
 }
 
 int b3RopeJoint_GetPointCount( b3JointId jointId )
@@ -116,13 +169,12 @@ int b3RopeJoint_GetWorldPoints( b3JointId jointId, b3Pos* points, int capacity )
 	return b3RopeWorldPoints( world, base, points, capacity );
 }
 
-// Force on body B along the path's first segment that ends on B (the rope's pull on it).
+// The rope's pull on body B: every segment pulls its ends toward each other.
 b3Vec3 b3GetRopeJointForce( b3World* world, b3JointSim* base )
 {
 	b3RopeJoint* joint = &base->ropeJoint;
 	b3Pos points[B3_MAX_ROPE_POINTS];
 	int count = b3RopeWorldPoints( world, base, points, B3_MAX_ROPE_POINTS );
-	float tension = joint->impulse * world->inv_h;
 	b3Vec3 force = b3Vec3_zero;
 	for ( int i = 0; i < count; ++i )
 	{
@@ -130,13 +182,14 @@ b3Vec3 b3GetRopeJointForce( b3World* world, b3JointSim* base )
 		{
 			continue;
 		}
-		// Each segment pulls its ends toward each other.
 		if ( i > 0 )
 		{
+			float tension = world->inv_h * b3RopeSegmentImpulse( joint, i - 1 );
 			force = b3MulAdd( force, tension, b3Normalize( b3SubPos( points[i - 1], points[i] ) ) );
 		}
 		if ( i + 1 < count )
 		{
+			float tension = world->inv_h * b3RopeSegmentImpulse( joint, i );
 			force = b3MulAdd( force, tension, b3Normalize( b3SubPos( points[i + 1], points[i] ) ) );
 		}
 	}
@@ -149,60 +202,77 @@ b3Vec3 b3GetRopeJointForce( b3World* world, b3JointSim* base )
 // v(k) = v + cross(w, r(k)) of the point's body
 // J = [JvA JwA JvB JwB], JvX = sum g(k) over X's points, JwX = sum cross(r(k), g(k))
 // Segments within one body keep their length: their terms cancel.
+//
+// Friction at inner point k acts on the length of the path up to k (its first k
+// segments): rope stuck at k keeps it, rope slipping through k changes it. Its impulse
+// pulls those segments tighter (or slacker) than the ones after k, bounded by the
+// capstan equation on the tension beyond k: T(before) <= T(after) e^(friction wrap),
+// T(before) >= T(after) e^(-friction wrap).
 
 typedef struct b3RopeJacobian
 {
 	b3Vec3 linearA, angularA;
 	b3Vec3 linearB, angularB;
-	float length;
 } b3RopeJacobian;
 
-// The path from the step's start (anchors, deltaCenter) moved by the bodies' deltas.
-static b3RopeJacobian b3RopeJacobianOf( const b3RopeJoint* joint, const b3BodyState* stateA, const b3BodyState* stateB )
+typedef struct b3RopePath
 {
-	b3Vec3 p[B3_MAX_ROPE_POINTS];
+	// Points relative to their body's center, and each segment's unit direction (zero
+	// when it has no length)
 	b3Vec3 r[B3_MAX_ROPE_POINTS];
+	b3Vec3 u[B3_MAX_ROPE_POINTS];
+	float length;
+} b3RopePath;
+
+// The path from the step's start (anchors, deltaCenter) moved by the bodies' deltas.
+static b3RopePath b3RopePathOf( const b3RopeJoint* joint, const b3BodyState* stateA, const b3BodyState* stateB )
+{
+	b3RopePath path = { 0 };
+	b3Vec3 p[B3_MAX_ROPE_POINTS];
 	b3Vec3 baseB = b3Add( joint->deltaCenter, stateB->deltaPosition );
 	int count = joint->pointCount;
 	for ( int i = 0; i < count; ++i )
 	{
 		if ( ( joint->bodyBMask >> i ) & 1u )
 		{
-			r[i] = b3RotateVector( stateB->deltaRotation, joint->anchors[i] );
-			p[i] = b3Add( baseB, r[i] );
+			path.r[i] = b3RotateVector( stateB->deltaRotation, joint->anchors[i] );
+			p[i] = b3Add( baseB, path.r[i] );
 		}
 		else
 		{
-			r[i] = b3RotateVector( stateA->deltaRotation, joint->anchors[i] );
-			p[i] = b3Add( stateA->deltaPosition, r[i] );
+			path.r[i] = b3RotateVector( stateA->deltaRotation, joint->anchors[i] );
+			p[i] = b3Add( stateA->deltaPosition, path.r[i] );
 		}
 	}
+	for ( int i = 0; i + 1 < count; ++i )
+	{
+		b3Vec3 d = b3Sub( p[i + 1], p[i] );
+		float length = b3Length( d );
+		path.length += length;
+		path.u[i] = length > FLT_EPSILON ? b3MulSV( 1.0f / length, d ) : b3Vec3_zero;
+	}
+	return path;
+}
 
+// Jacobian of the length of the path's first `points` points (the whole rope at
+// pointCount).
+static b3RopeJacobian b3RopeJacobianOf( const b3RopeJoint* joint, const b3RopePath* path, int points )
+{
 	b3RopeJacobian j = { 0 };
 	b3Vec3 previous = b3Vec3_zero;
-	for ( int i = 0; i < count; ++i )
+	for ( int i = 0; i < points; ++i )
 	{
-		b3Vec3 next = b3Vec3_zero;
-		if ( i + 1 < count )
-		{
-			b3Vec3 d = b3Sub( p[i + 1], p[i] );
-			float length = b3Length( d );
-			j.length += length;
-			if ( length > FLT_EPSILON )
-			{
-				next = b3MulSV( 1.0f / length, d );
-			}
-		}
+		b3Vec3 next = i + 1 < points ? path->u[i] : b3Vec3_zero;
 		b3Vec3 g = b3Sub( previous, next );
 		if ( ( joint->bodyBMask >> i ) & 1u )
 		{
 			j.linearB = b3Add( j.linearB, g );
-			j.angularB = b3Add( j.angularB, b3Cross( r[i], g ) );
+			j.angularB = b3Add( j.angularB, b3Cross( path->r[i], g ) );
 		}
 		else
 		{
 			j.linearA = b3Add( j.linearA, g );
-			j.angularA = b3Add( j.angularA, b3Cross( r[i], g ) );
+			j.angularA = b3Add( j.angularA, b3Cross( path->r[i], g ) );
 		}
 		previous = next;
 	}
@@ -213,6 +283,12 @@ static float b3RopeInvMass( const b3JointSim* base, const b3RopeJacobian* j )
 {
 	return base->invMassA * b3Dot( j->linearA, j->linearA ) + b3Dot( j->angularA, b3MulMV( base->invIA, j->angularA ) ) +
 		   base->invMassB * b3Dot( j->linearB, j->linearB ) + b3Dot( j->angularB, b3MulMV( base->invIB, j->angularB ) );
+}
+
+// The rate the length lengthens.
+static float b3RopeRate( const b3RopeJacobian* j, b3Vec3 vA, b3Vec3 wA, b3Vec3 vB, b3Vec3 wB )
+{
+	return b3Dot( j->linearA, vA ) + b3Dot( j->angularA, wA ) + b3Dot( j->linearB, vB ) + b3Dot( j->angularB, wB );
 }
 
 // Velocities change by -invM J^T impulse: the rope pulls its points toward each other.
@@ -261,14 +337,16 @@ void b3PrepareRopeJoint( b3JointSim* base, b3StepContext* context )
 	}
 	joint->deltaCenter = b3SubPos( bodySimB->center, bodySimA->center );
 
+	b3BodyState identity = b3_identityBodyState;
+	b3RopePath path = b3RopePathOf( joint, &identity, &identity );
+
 	// Taut, the rope is a spring of rate EA / L on the path's coordinate: its natural
 	// frequency follows from the effective mass there. Clamped to the step like other
 	// joint springs; a stiffer rope than the step resolves stays as stiff as it can.
 	joint->soft = false;
 	if ( joint->stiffness > 0.0f )
 	{
-		b3BodyState identity = b3_identityBodyState;
-		b3RopeJacobian j = b3RopeJacobianOf( joint, &identity, &identity );
+		b3RopeJacobian j = b3RopeJacobianOf( joint, &path, joint->pointCount );
 		float invMass = b3RopeInvMass( base, &j );
 		if ( invMass > 0.0f )
 		{
@@ -280,9 +358,32 @@ void b3PrepareRopeJoint( b3JointSim* base, b3StepContext* context )
 		}
 	}
 
+	// The capstan bounds from the angle the path turns through at each inner point.
+	for ( int k = 1; k + 1 < joint->pointCount; ++k )
+	{
+		joint->gripTighter[k] = 0.0f;
+		joint->gripSlacker[k] = 0.0f;
+		joint->slipEnergy[k] = 0.0f;
+		float wrap = acosf( b3ClampFloat( b3Dot( path.u[k - 1], path.u[k] ), -1.0f, 1.0f ) );
+		float grip = joint->friction[k] * wrap;
+		if ( grip > 0.0f )
+		{
+			joint->gripTighter[k] = expf( grip ) - 1.0f;
+			joint->gripSlacker[k] = 1.0f - expf( -grip );
+		}
+		else
+		{
+			joint->frictionImpulse[k] = 0.0f;
+		}
+	}
+
 	if ( context->enableWarmStarting == false )
 	{
 		joint->impulse = 0.0f;
+		for ( int k = 0; k < B3_MAX_ROPE_POINTS; ++k )
+		{
+			joint->frictionImpulse[k] = 0.0f;
+		}
 	}
 }
 
@@ -296,13 +397,23 @@ void b3WarmStartRopeJoint( b3JointSim* base, b3StepContext* context )
 	b3BodyState* stateA = joint->indexA == B3_NULL_INDEX ? &dummyState : context->states + joint->indexA;
 	b3BodyState* stateB = joint->indexB == B3_NULL_INDEX ? &dummyState : context->states + joint->indexB;
 
-	b3RopeJacobian j = b3RopeJacobianOf( joint, stateA, stateB );
+	b3RopePath path = b3RopePathOf( joint, stateA, stateB );
 
 	b3Vec3 vA = stateA->linearVelocity;
 	b3Vec3 wA = stateA->angularVelocity;
 	b3Vec3 vB = stateB->linearVelocity;
 	b3Vec3 wB = stateB->angularVelocity;
+
+	b3RopeJacobian j = b3RopeJacobianOf( joint, &path, joint->pointCount );
 	b3RopeApply( base, &j, joint->impulse, &vA, &wA, &vB, &wB );
+	for ( int k = 1; k + 1 < joint->pointCount; ++k )
+	{
+		if ( joint->frictionImpulse[k] != 0.0f )
+		{
+			b3RopeJacobian jk = b3RopeJacobianOf( joint, &path, k + 1 );
+			b3RopeApply( base, &jk, joint->frictionImpulse[k], &vA, &wA, &vB, &wB );
+		}
+	}
 
 	if ( stateA->flags & b3_dynamicFlag )
 	{
@@ -332,13 +443,38 @@ void b3SolveRopeJoint( b3JointSim* base, b3StepContext* context, bool useBias )
 	b3Vec3 vB = stateB->linearVelocity;
 	b3Vec3 wB = stateB->angularVelocity;
 
-	b3RopeJacobian j = b3RopeJacobianOf( joint, stateA, stateB );
+	b3RopePath path = b3RopePathOf( joint, stateA, stateB );
+
+	// Friction first, bounded by the tension beyond each point (like contact friction by
+	// the normal impulse); from the far end in, so each bound sees this pass's impulses.
+	for ( int k = joint->pointCount - 2; k >= 1; --k )
+	{
+		if ( joint->gripTighter[k] == 0.0f )
+		{
+			continue;
+		}
+		b3RopeJacobian jk = b3RopeJacobianOf( joint, &path, k + 1 );
+		float invMass = b3RopeInvMass( base, &jk );
+		if ( invMass == 0.0f )
+		{
+			continue;
+		}
+		float beyond = b3RopeSegmentImpulse( joint, k );
+		float impulse = b3RopeRate( &jk, vA, wA, vB, wB ) / invMass;
+		float newImpulse =
+			b3ClampFloat( joint->frictionImpulse[k] + impulse, -joint->gripSlacker[k] * beyond, joint->gripTighter[k] * beyond );
+		impulse = newImpulse - joint->frictionImpulse[k];
+		joint->frictionImpulse[k] = newImpulse;
+		b3RopeApply( base, &jk, impulse, &vA, &wA, &vB, &wB );
+	}
+
+	b3RopeJacobian j = b3RopeJacobianOf( joint, &path, joint->pointCount );
 	float invMass = b3RopeInvMass( base, &j );
 	if ( invMass > 0.0f )
 	{
 		// Slack: speculative. Taut: the rope's own spring, or (inextensible) the joint
 		// softness while biased, like a limit.
-		float slack = joint->length - j.length;
+		float slack = joint->length - path.length;
 		float bias = 0.0f;
 		float massScale = 1.0f;
 		float impulseScale = 0.0f;
@@ -360,13 +496,28 @@ void b3SolveRopeJoint( b3JointSim* base, b3StepContext* context, bool useBias )
 		}
 
 		// Rate the slack opens: -Cdot
-		float Cdot = -( b3Dot( j.linearA, vA ) + b3Dot( j.angularA, wA ) + b3Dot( j.linearB, vB ) + b3Dot( j.angularB, wB ) );
+		float Cdot = -b3RopeRate( &j, vA, wA, vB, wB );
 		float impulse = -massScale * ( Cdot + bias ) / invMass - impulseScale * joint->impulse;
 		float newImpulse = b3MaxFloat( 0.0f, joint->impulse + impulse );
 		impulse = newImpulse - joint->impulse;
 		joint->impulse = newImpulse;
 
 		b3RopeApply( base, &j, impulse, &vA, &wA, &vB, &wB );
+	}
+
+	// Relaxed (each substep's final velocities): the work friction does against the slip,
+	// summed over the step.
+	if ( useBias == false )
+	{
+		for ( int k = 1; k + 1 < joint->pointCount; ++k )
+		{
+			if ( joint->gripTighter[k] == 0.0f )
+			{
+				continue;
+			}
+			b3RopeJacobian jk = b3RopeJacobianOf( joint, &path, k + 1 );
+			joint->slipEnergy[k] += b3AbsFloat( joint->frictionImpulse[k] * b3RopeRate( &jk, vA, wA, vB, wB ) );
+		}
 	}
 
 	if ( stateA->flags & b3_dynamicFlag )

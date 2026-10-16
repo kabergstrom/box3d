@@ -640,6 +640,10 @@ b3RopeJointDef b3RecR_ROPEJOINTDEF( b3RecReader* rdr )
 	def.length = b3RecR_F32( rdr );
 	def.stiffness = b3RecR_F32( rdr );
 	def.dampingRatio = b3RecR_F32( rdr );
+	for ( int i = 0; i < B3_MAX_ROPE_POINTS; ++i )
+	{
+		def.friction[i] = b3RecR_F32( rdr );
+	}
 	return def;
 }
 
