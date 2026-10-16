@@ -1058,8 +1058,10 @@ B3_API b3WheelJointDef b3DefaultWheelJointDef( void );
 /// every segment carries the same tension. With friction at an inner point the rope grips
 /// it (capstan friction): it holds there until one side pulls more than e^(friction * wrap)
 /// times the other, wrap being the angle the path turns through at the point, and slips
-/// past that, losing energy as it goes. A static body stands in for the world.
-/// The base frames are unused (the points carry the attachments).
+/// past that, losing energy as it goes. Bending stiffness and damping resist a segment
+/// turning on the body at either end of it (a hook swinging under its sheave). A static
+/// body stands in for the world. The base frames are unused (the points carry the
+/// attachments).
 /// @ingroup rope_joint
 typedef struct b3RopeJointDef
 {
@@ -1088,6 +1090,18 @@ typedef struct b3RopeJointDef
 	/// Friction coefficient between the rope and each point it passes through (zero:
 	/// free; about 0.25 for rope on iron, 0.4 on wood or rope). The ends' are unused.
 	float friction[B3_MAX_ROPE_POINTS];
+
+	/// Bending stiffness EI (newton square meters): a segment turned by an angle on the
+	/// body at one of its ends, away from the direction it had there when the joint was
+	/// created, is bent back with a moment EI angle / segment length. Zero: the rope
+	/// hangs freely.
+	float bendStiffness;
+
+	/// Bending damping (newton square meter seconds), the rope's internal friction: a
+	/// segment turning on the body at one of its ends at an angular rate w is held back
+	/// with a moment bendDamping w / segment length. It takes the energy out of a load
+	/// swinging on the rope.
+	float bendDamping;
 } b3RopeJointDef;
 
 /// Use this to initialize your joint definition

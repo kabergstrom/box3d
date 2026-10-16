@@ -50,13 +50,15 @@ typedef struct b3World b3World;
 // Major version 6 widened the body def with the safety factor.
 // Major version 7 added the contact spring to the surface material.
 // Major version 8 widened the rope joint def with friction.
-#define B3_REC_VERSION_MAJOR 8
+// Major version 9 widened the rope joint def with bending.
+#define B3_REC_VERSION_MAJOR 9
 
 // Minor tracks op-stream additions that keep the 48 byte header shape.
 // Minor version 7 made the contact body sim locators persistent
 // Minor version 9 added the body sleep time op
 // Minor version 10 added the rope joint ops
-#define B3_REC_VERSION_MINOR 10
+// Minor version 11 added the rope joint bending ops
+#define B3_REC_VERSION_MINOR 11
 
 // File header, fixed 48 bytes. Contains the registry locator so the player
 // can load geometry before replaying any ops.

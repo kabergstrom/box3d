@@ -559,7 +559,10 @@ b3JointId b3CreateRopeJoint( b3WorldId worldId, const b3RopeJointDef* def )
 	joint->ropeJoint.length = b3ClampFloat( def->length, B3_LINEAR_SLOP, B3_HUGE );
 	joint->ropeJoint.stiffness = b3MaxFloat( def->stiffness, 0.0f );
 	joint->ropeJoint.dampingRatio = b3MaxFloat( def->dampingRatio, 0.0f );
+	joint->ropeJoint.bendStiffness = b3IsValidFloat( def->bendStiffness ) ? b3MaxFloat( def->bendStiffness, 0.0f ) : 0.0f;
+	joint->ropeJoint.bendDamping = b3IsValidFloat( def->bendDamping ) ? b3MaxFloat( def->bendDamping, 0.0f ) : 0.0f;
 	joint->ropeJoint.impulse = 0.0f;
+	b3SetRopeJointRest( world, joint );
 
 	b3JointId jointId = { joint->jointId + 1, world->worldId, pair.joint->generation };
 	B3_REC_CREATE( world, CreateRopeJoint, jointId, worldId, *def );

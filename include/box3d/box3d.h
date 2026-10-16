@@ -1896,6 +1896,18 @@ B3_API void b3RopeJoint_SetDampingRatio( b3JointId jointId, float dampingRatio )
 /// Get the damping ratio.
 B3_API float b3RopeJoint_GetDampingRatio( b3JointId jointId );
 
+/// Set the bending stiffness EI (newton square meters). @see b3RopeJointDef::bendStiffness
+B3_API void b3RopeJoint_SetBendStiffness( b3JointId jointId, float bendStiffness );
+
+/// Get the bending stiffness.
+B3_API float b3RopeJoint_GetBendStiffness( b3JointId jointId );
+
+/// Set the bending damping (newton square meter seconds). @see b3RopeJointDef::bendDamping
+B3_API void b3RopeJoint_SetBendDamping( b3JointId jointId, float bendDamping );
+
+/// Get the bending damping.
+B3_API float b3RopeJoint_GetBendDamping( b3JointId jointId );
+
 /// The path's current length (the sum of its segments).
 B3_API float b3RopeJoint_GetCurrentLength( b3JointId jointId );
 

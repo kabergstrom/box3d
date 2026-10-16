@@ -347,7 +347,7 @@ _Static_assert( sizeof( void* ) != 8 || sizeof( b3WeldJointDef ) == 128,
 				"b3WeldJointDef changed: update b3RecW_WELDJOINTDEF and its reader together" );
 _Static_assert( sizeof( void* ) != 8 || sizeof( b3WheelJointDef ) == 184,
 				"b3WheelJointDef changed: update b3RecW_WHEELJOINTDEF and its reader together" );
-_Static_assert( sizeof( void* ) != 8 || sizeof( b3RopeJointDef ) == 264,
+_Static_assert( sizeof( void* ) != 8 || sizeof( b3RopeJointDef ) == 272,
 				"b3RopeJointDef changed: update b3RecW_ROPEJOINTDEF and its reader together" );
 
 void b3RecW_EXPLOSIONDEF( b3RecBuffer* buf, b3ExplosionDef v )
@@ -549,6 +549,8 @@ void b3RecW_ROPEJOINTDEF( b3RecBuffer* buf, b3RopeJointDef v )
 	{
 		b3RecW_F32( buf, v.friction[i] );
 	}
+	b3RecW_F32( buf, v.bendStiffness );
+	b3RecW_F32( buf, v.bendDamping );
 }
 
 void b3RecW_WHEELJOINTDEF( b3RecBuffer* buf, b3WheelJointDef v )

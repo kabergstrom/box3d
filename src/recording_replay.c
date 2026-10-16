@@ -644,6 +644,8 @@ b3RopeJointDef b3RecR_ROPEJOINTDEF( b3RecReader* rdr )
 	{
 		def.friction[i] = b3RecR_F32( rdr );
 	}
+	def.bendStiffness = b3RecR_F32( rdr );
+	def.bendDamping = b3RecR_F32( rdr );
 	return def;
 }
 
@@ -1335,6 +1337,16 @@ static void b3RecDispatch_RopeJointSetStiffness( const b3RecArgs_RopeJointSetSti
 static void b3RecDispatch_RopeJointSetDampingRatio( const b3RecArgs_RopeJointSetDampingRatio* a, b3RecReader* rdr )
 {
 	b3RopeJoint_SetDampingRatio( b3RecMakeJointId( rdr, a->joint ), a->dampingRatio );
+}
+
+static void b3RecDispatch_RopeJointSetBendStiffness( const b3RecArgs_RopeJointSetBendStiffness* a, b3RecReader* rdr )
+{
+	b3RopeJoint_SetBendStiffness( b3RecMakeJointId( rdr, a->joint ), a->bendStiffness );
+}
+
+static void b3RecDispatch_RopeJointSetBendDamping( const b3RecArgs_RopeJointSetBendDamping* a, b3RecReader* rdr )
+{
+	b3RopeJoint_SetBendDamping( b3RecMakeJointId( rdr, a->joint ), a->bendDamping );
 }
 
 static void b3RecDispatch_DestroyJoint( const b3RecArgs_DestroyJoint* a, b3RecReader* rdr )

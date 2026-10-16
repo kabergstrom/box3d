@@ -243,3 +243,5 @@ B3_REC_OP( 0xF3, CreateRopeJoint, RET_JOINTID, ARG( WORLDID, world ) ARG( ROPEJO
 B3_REC_OP( 0xF4, RopeJointSetLength, RET_NONE, ARG( JOINTID, joint ) ARG( F32, length ) )
 B3_REC_OP( 0xF5, RopeJointSetStiffness, RET_NONE, ARG( JOINTID, joint ) ARG( F32, stiffness ) )
 B3_REC_OP( 0xF6, RopeJointSetDampingRatio, RET_NONE, ARG( JOINTID, joint ) ARG( F32, dampingRatio ) )
+B3_REC_OP( 0xF7, RopeJointSetBendStiffness, RET_NONE, ARG( JOINTID, joint ) ARG( F32, bendStiffness ) )
+B3_REC_OP( 0xF8, RopeJointSetBendDamping, RET_NONE, ARG( JOINTID, joint ) ARG( F32, bendDamping ) )

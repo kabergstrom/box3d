@@ -315,9 +315,20 @@ typedef struct b3RopeJoint
 	float stiffness;
 	float dampingRatio;
 	float friction[B3_MAX_ROPE_POINTS];
+	float bendStiffness;
+	float bendDamping;
+
+	// Each segment's direction when created, local to the body at its start and at its
+	// end (zero when it had no length)
+	b3Vec3 restStart[B3_MAX_ROPE_POINTS];
+	b3Vec3 restEnd[B3_MAX_ROPE_POINTS];
 
 	// Tension impulse (non-negative): the last segment's
 	float impulse;
+
+	// Bending angular impulse at each segment's start and end (world, across the segment)
+	b3Vec3 bendStartImpulse[B3_MAX_ROPE_POINTS];
+	b3Vec3 bendEndImpulse[B3_MAX_ROPE_POINTS];
 
 	// Friction impulse at each inner point: how much more the segments before it pull
 	// than those after
@@ -338,6 +349,9 @@ typedef struct b3RopeJoint
 	bool soft;
 	float gripTighter[B3_MAX_ROPE_POINTS];
 	float gripSlacker[B3_MAX_ROPE_POINTS];
+	// The rest directions in world space at the start of the step
+	b3Vec3 restStartWorld[B3_MAX_ROPE_POINTS];
+	b3Vec3 restEndWorld[B3_MAX_ROPE_POINTS];
 } b3RopeJoint;
 
 /// The base joint class. Joints are used to constraint two bodies together in
@@ -459,3 +473,4 @@ void b3DrawWheelJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform tra
 void b3DrawRopeJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB );
 float b3GetRopeJointLength( b3World* world, b3JointSim* base );
 float b3GetRopeJointMaxImpulse( const b3RopeJoint* joint );
+void b3SetRopeJointRest( b3World* world, b3JointSim* base );

@@ -54,6 +54,34 @@ float b3RopeJoint_GetDampingRatio( b3JointId jointId )
 	return base->ropeJoint.dampingRatio;
 }
 
+void b3RopeJoint_SetBendStiffness( b3JointId jointId, float bendStiffness )
+{
+	b3World* world = b3GetWorld( jointId.world0 );
+	B3_REC( world, RopeJointSetBendStiffness, jointId, bendStiffness );
+	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_ropeJoint );
+	base->ropeJoint.bendStiffness = b3MaxFloat( bendStiffness, 0.0f );
+}
+
+float b3RopeJoint_GetBendStiffness( b3JointId jointId )
+{
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_ropeJoint );
+	return base->ropeJoint.bendStiffness;
+}
+
+void b3RopeJoint_SetBendDamping( b3JointId jointId, float bendDamping )
+{
+	b3World* world = b3GetWorld( jointId.world0 );
+	B3_REC( world, RopeJointSetBendDamping, jointId, bendDamping );
+	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_ropeJoint );
+	base->ropeJoint.bendDamping = b3MaxFloat( bendDamping, 0.0f );
+}
+
+float b3RopeJoint_GetBendDamping( b3JointId jointId )
+{
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_ropeJoint );
+	return base->ropeJoint.bendDamping;
+}
+
 // World points of the path, at most capacity.
 static int b3RopeWorldPoints( b3World* world, b3JointSim* base, b3Pos* points, int capacity )
 {
@@ -79,6 +107,23 @@ float b3GetRopeJointLength( b3World* world, b3JointSim* base )
 		length += b3Length( b3SubPos( points[i + 1], points[i] ) );
 	}
 	return length;
+}
+
+void b3SetRopeJointRest( b3World* world, b3JointSim* base )
+{
+	b3RopeJoint* joint = &base->ropeJoint;
+	b3Pos points[B3_MAX_ROPE_POINTS];
+	int count = b3RopeWorldPoints( world, base, points, B3_MAX_ROPE_POINTS );
+	b3Quat qA = b3GetBodyTransform( world, base->bodyIdA ).q;
+	b3Quat qB = b3GetBodyTransform( world, base->bodyIdB ).q;
+	for ( int i = 0; i + 1 < count; ++i )
+	{
+		b3Vec3 d = b3SubPos( points[i + 1], points[i] );
+		float length = b3Length( d );
+		b3Vec3 u = length > FLT_EPSILON ? b3MulSV( 1.0f / length, d ) : b3Vec3_zero;
+		joint->restStart[i] = b3InvRotateVector( ( joint->bodyBMask >> i ) & 1u ? qB : qA, u );
+		joint->restEnd[i] = b3InvRotateVector( ( joint->bodyBMask >> ( i + 1 ) ) & 1u ? qB : qA, u );
+	}
 }
 
 float b3RopeJoint_GetCurrentLength( b3JointId jointId )
@@ -221,6 +266,7 @@ typedef struct b3RopePath
 	// when it has no length)
 	b3Vec3 r[B3_MAX_ROPE_POINTS];
 	b3Vec3 u[B3_MAX_ROPE_POINTS];
+	float segment[B3_MAX_ROPE_POINTS];
 	float length;
 } b3RopePath;
 
@@ -248,6 +294,7 @@ static b3RopePath b3RopePathOf( const b3RopeJoint* joint, const b3BodyState* sta
 	{
 		b3Vec3 d = b3Sub( p[i + 1], p[i] );
 		float length = b3Length( d );
+		path.segment[i] = length;
 		path.length += length;
 		path.u[i] = length > FLT_EPSILON ? b3MulSV( 1.0f / length, d ) : b3Vec3_zero;
 	}
@@ -299,6 +346,113 @@ static void b3RopeApply( const b3JointSim* base, const b3RopeJacobian* j, float 
 	*wA = b3Sub( *wA, b3MulMV( base->invIA, b3MulSV( impulse, j->angularA ) ) );
 	*vB = b3MulSub( *vB, base->invMassB * impulse, j->linearB );
 	*wB = b3Sub( *wB, b3MulMV( base->invIB, b3MulSV( impulse, j->angularB ) ) );
+}
+
+// Bending: segment i turning on the body at its start (or end), about an axis e across
+// it. Its own angular velocity about e is dot(e, cross(u, v(i+1) - v(i))) / segment,
+// that is dot(cross(e, u), v(i+1) - v(i)) / segment; the body's is dot(e, w).
+// Cdot = dot(t, v(i+1) - v(i)) - dot(e, w), t = cross(e, u) / segment
+// C = dot(e, cross(rest, u)), the angle turned from the rest direction about e
+// Only segments between the two bodies turn on them.
+static bool b3RopeBends( const b3RopeJoint* joint, int segment )
+{
+	return ( ( joint->bodyBMask >> segment ) & 1u ) != ( ( joint->bodyBMask >> ( segment + 1 ) ) & 1u );
+}
+
+static void b3RopeAddPoint( const b3RopeJoint* joint, b3RopeJacobian* j, const b3RopePath* path, int i, b3Vec3 linear )
+{
+	if ( ( joint->bodyBMask >> i ) & 1u )
+	{
+		j->linearB = b3Add( j->linearB, linear );
+		j->angularB = b3Add( j->angularB, b3Cross( path->r[i], linear ) );
+	}
+	else
+	{
+		j->linearA = b3Add( j->linearA, linear );
+		j->angularA = b3Add( j->angularA, b3Cross( path->r[i], linear ) );
+	}
+}
+
+static b3RopeJacobian b3RopeBendJacobian( const b3RopeJoint* joint, const b3RopePath* path, int segment, bool atEnd, b3Vec3 e )
+{
+	b3RopeJacobian j = { 0 };
+	b3Vec3 t = b3MulSV( 1.0f / path->segment[segment], b3Cross( e, path->u[segment] ) );
+	b3RopeAddPoint( joint, &j, path, segment, b3Neg( t ) );
+	b3RopeAddPoint( joint, &j, path, segment + 1, t );
+	if ( ( joint->bodyBMask >> ( atEnd ? segment + 1 : segment ) ) & 1u )
+	{
+		j.angularB = b3Sub( j.angularB, e );
+	}
+	else
+	{
+		j.angularA = b3Sub( j.angularA, e );
+	}
+	return j;
+}
+
+// Apply the bending impulses held (warm start), or solve them: a spring-damper of
+// bendStiffness / segment and bendDamping / segment per radian, implicit over the substep.
+static void b3RopeBend( const b3JointSim* base, b3RopeJoint* joint, const b3RopePath* path, const b3BodyState* stateA,
+						const b3BodyState* stateB, float h, bool solve, b3Vec3* vA, b3Vec3* wA, b3Vec3* vB, b3Vec3* wB )
+{
+	for ( int i = 0; i + 1 < joint->pointCount; ++i )
+	{
+		if ( b3RopeBends( joint, i ) == false || path->segment[i] < B3_LINEAR_SLOP )
+		{
+			continue;
+		}
+		b3Vec3 u = path->u[i];
+		b3Vec3 e1 = b3Perp( u );
+		b3Vec3 axes[2] = { e1, b3Cross( u, e1 ) };
+		float k = joint->bendStiffness / path->segment[i];
+		float c = joint->bendDamping / path->segment[i];
+		float gamma = 1.0f / ( h * ( c + h * k ) );
+		float biasRate = k / ( c + h * k );
+		for ( int end = 0; end < 2; ++end )
+		{
+			bool atEnd = end == 1;
+			b3Vec3* held = atEnd ? joint->bendEndImpulse + i : joint->bendStartImpulse + i;
+			bool onB = ( joint->bodyBMask >> ( atEnd ? i + 1 : i ) ) & 1u;
+			b3Vec3 rest = b3RotateVector( onB ? stateB->deltaRotation : stateA->deltaRotation,
+										  atEnd ? joint->restEndWorld[i] : joint->restStartWorld[i] );
+			b3Vec3 bent = b3Cross( rest, u );
+			b3Vec3 total = b3Vec3_zero;
+			for ( int a = 0; a < 2; ++a )
+			{
+				b3Vec3 e = axes[a];
+				b3RopeJacobian j = b3RopeBendJacobian( joint, path, i, atEnd, e );
+				float impulse = b3Dot( *held, e );
+				if ( solve )
+				{
+					float invMass = b3RopeInvMass( base, &j );
+					float Cdot = b3RopeRate( &j, *vA, *wA, *vB, *wB );
+					float step = ( Cdot + biasRate * b3Dot( bent, e ) - gamma * impulse ) / ( invMass + gamma );
+					b3RopeApply( base, &j, step, vA, wA, vB, wB );
+					impulse += step;
+				}
+				else
+				{
+					b3RopeApply( base, &j, impulse, vA, wA, vB, wB );
+				}
+				total = b3MulAdd( total, impulse, e );
+			}
+			*held = total;
+		}
+	}
+}
+
+static bool b3RopeBendActive( const b3RopeJoint* joint )
+{
+	return joint->bendStiffness > 0.0f || joint->bendDamping > 0.0f;
+}
+
+static void b3RopeBendRelease( b3RopeJoint* joint )
+{
+	for ( int i = 0; i < B3_MAX_ROPE_POINTS; ++i )
+	{
+		joint->bendStartImpulse[i] = b3Vec3_zero;
+		joint->bendEndImpulse[i] = b3Vec3_zero;
+	}
 }
 
 void b3PrepareRopeJoint( b3JointSim* base, b3StepContext* context )
@@ -377,6 +531,15 @@ void b3PrepareRopeJoint( b3JointSim* base, b3StepContext* context )
 		}
 	}
 
+	// The rest directions, carried by their bodies.
+	for ( int i = 0; i + 1 < joint->pointCount; ++i )
+	{
+		b3Quat qStart = ( ( joint->bodyBMask >> i ) & 1u ? bodySimB : bodySimA )->transform.q;
+		b3Quat qEnd = ( ( joint->bodyBMask >> ( i + 1 ) ) & 1u ? bodySimB : bodySimA )->transform.q;
+		joint->restStartWorld[i] = b3RotateVector( qStart, joint->restStart[i] );
+		joint->restEndWorld[i] = b3RotateVector( qEnd, joint->restEnd[i] );
+	}
+
 	if ( context->enableWarmStarting == false )
 	{
 		joint->impulse = 0.0f;
@@ -384,6 +547,10 @@ void b3PrepareRopeJoint( b3JointSim* base, b3StepContext* context )
 		{
 			joint->frictionImpulse[k] = 0.0f;
 		}
+	}
+	if ( context->enableWarmStarting == false || b3RopeBendActive( joint ) == false )
+	{
+		b3RopeBendRelease( joint );
 	}
 }
 
@@ -413,6 +580,10 @@ void b3WarmStartRopeJoint( b3JointSim* base, b3StepContext* context )
 			b3RopeJacobian jk = b3RopeJacobianOf( joint, &path, k + 1 );
 			b3RopeApply( base, &jk, joint->frictionImpulse[k], &vA, &wA, &vB, &wB );
 		}
+	}
+	if ( b3RopeBendActive( joint ) )
+	{
+		b3RopeBend( base, joint, &path, stateA, stateB, context->h, false, &vA, &wA, &vB, &wB );
 	}
 
 	if ( stateA->flags & b3_dynamicFlag )
@@ -503,6 +674,19 @@ void b3SolveRopeJoint( b3JointSim* base, b3StepContext* context, bool useBias )
 		joint->impulse = newImpulse;
 
 		b3RopeApply( base, &j, impulse, &vA, &wA, &vB, &wB );
+	}
+
+	// Bending, while taut: slack rope hangs as it likes.
+	if ( b3RopeBendActive( joint ) )
+	{
+		if ( path.length < joint->length - B3_LINEAR_SLOP )
+		{
+			b3RopeBendRelease( joint );
+		}
+		else
+		{
+			b3RopeBend( base, joint, &path, stateA, stateB, context->h, true, &vA, &wA, &vB, &wB );
+		}
 	}
 
 	// Relaxed (each substep's final velocities): the work friction does against the slip,
