@@ -1908,6 +1908,18 @@ B3_API void b3RopeJoint_SetBendDamping( b3JointId jointId, float bendDamping );
 /// Get the bending damping.
 B3_API float b3RopeJoint_GetBendDamping( b3JointId jointId );
 
+/// Set segment `segment`'s rest directions: its direction when the rope was created, local
+/// to the body holding its start point (`start`) and the one holding its end point (`end`).
+/// Bending turns a segment back toward them. A rope created again from saved state (a
+/// loaded world, a joining peer) takes the rest its predecessor had instead of its
+/// directions at creation. Unit vectors (zero: no rest); an invalid segment or vector is
+/// ignored.
+B3_API void b3RopeJoint_SetRestDirections( b3JointId jointId, int segment, b3Vec3 start, b3Vec3 end );
+
+/// Each segment's rest directions (see b3RopeJoint_SetRestDirections), end to end, at most
+/// `capacity`. Returns the number written (the point count less one).
+B3_API int b3RopeJoint_GetRestDirections( b3JointId jointId, b3Vec3* start, b3Vec3* end, int capacity );
+
 /// The path's current length (the sum of its segments).
 B3_API float b3RopeJoint_GetCurrentLength( b3JointId jointId );
 

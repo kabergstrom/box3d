@@ -1349,6 +1349,11 @@ static void b3RecDispatch_RopeJointSetBendDamping( const b3RecArgs_RopeJointSetB
 	b3RopeJoint_SetBendDamping( b3RecMakeJointId( rdr, a->joint ), a->bendDamping );
 }
 
+static void b3RecDispatch_RopeJointSetRestDirections( const b3RecArgs_RopeJointSetRestDirections* a, b3RecReader* rdr )
+{
+	b3RopeJoint_SetRestDirections( b3RecMakeJointId( rdr, a->joint ), a->segment, a->start, a->end );
+}
+
 static void b3RecDispatch_DestroyJoint( const b3RecArgs_DestroyJoint* a, b3RecReader* rdr )
 {
 	b3DestroyJoint( b3RecMakeJointId( rdr, a->joint ), a->wakeAttached );

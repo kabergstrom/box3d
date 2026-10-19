@@ -82,6 +82,36 @@ float b3RopeJoint_GetBendDamping( b3JointId jointId )
 	return base->ropeJoint.bendDamping;
 }
 
+void b3RopeJoint_SetRestDirections( b3JointId jointId, int segment, b3Vec3 start, b3Vec3 end )
+{
+	b3World* world = b3GetWorld( jointId.world0 );
+	B3_REC( world, RopeJointSetRestDirections, jointId, segment, start, end );
+	b3JointSim* base = b3GetJointSimCheckType( jointId, b3_ropeJoint );
+	b3RopeJoint* joint = &base->ropeJoint;
+	if ( segment < 0 || segment + 1 >= joint->pointCount || b3IsValidVec3( start ) == false || b3IsValidVec3( end ) == false )
+	{
+		return;
+	}
+	joint->restStart[segment] = start;
+	joint->restEnd[segment] = end;
+}
+
+int b3RopeJoint_GetRestDirections( b3JointId jointId, b3Vec3* start, b3Vec3* end, int capacity )
+{
+	b3JointSim* base = b3ReadJointSimCheckType( jointId, b3_ropeJoint );
+	if ( start == NULL || end == NULL )
+	{
+		return 0;
+	}
+	int count = 0;
+	for ( ; count + 1 < base->ropeJoint.pointCount && count < capacity; ++count )
+	{
+		start[count] = base->ropeJoint.restStart[count];
+		end[count] = base->ropeJoint.restEnd[count];
+	}
+	return count;
+}
+
 // World points of the path, at most capacity.
 static int b3RopeWorldPoints( b3World* world, b3JointSim* base, b3Pos* points, int capacity )
 {
