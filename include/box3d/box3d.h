@@ -1957,4 +1957,11 @@ B3_API bool b3Contact_IsValid( b3ContactId id );
 /// Get the manifolds for a contact. The manifold may have no points if the contact is not touching.
 B3_API b3ContactData b3Contact_GetData( b3ContactId contactId );
 
+/// Get the user material ids of both shapes where a contact point touches, as hit events report them:
+/// a mesh or height field gives the material of the point's triangle, a compound its child's material and
+/// a convex shape its own. Pass the triangleIndex of one of the contact's manifold points; a negative
+/// index gives each shape's first material.
+B3_API void b3Contact_GetUserMaterialIds( b3ContactId contactId, int triangleIndex, uint64_t* userMaterialIdA,
+										  uint64_t* userMaterialIdB );
+
 /**@}*/ // contact

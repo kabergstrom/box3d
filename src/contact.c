@@ -94,6 +94,27 @@ b3ContactData b3Contact_GetData( b3ContactId contactId )
 	return data;
 }
 
+void b3Contact_GetUserMaterialIds( b3ContactId contactId, int triangleIndex, uint64_t* userMaterialIdA,
+								   uint64_t* userMaterialIdB )
+{
+	b3World* world = b3GetWorld( contactId.world0 );
+	b3Contact* contact = b3GetContactFullId( world, contactId );
+
+	const b3Shape* shapeA = b3Array_Get( world->shapes, contact->shapeIdA );
+	const b3Shape* shapeB = b3Array_Get( world->shapes, contact->shapeIdB );
+
+	if ( triangleIndex < 0 )
+	{
+		*userMaterialIdA = b3GetShapeMaterials( shapeA )[0].userMaterialId;
+		*userMaterialIdB = b3GetShapeMaterials( shapeB )[0].userMaterialId;
+		return;
+	}
+
+	// As the hit events: shapeB is never a compound (asserted in b3CreateContact).
+	*userMaterialIdA = b3GetShapeUserMaterialId( shapeA, contact->childIndex, triangleIndex );
+	*userMaterialIdB = b3GetShapeUserMaterialId( shapeB, 0, triangleIndex );
+}
+
 struct b3ContactRegister
 {
 	// b3ManifoldFcn* fcn;

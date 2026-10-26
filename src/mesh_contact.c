@@ -1092,11 +1092,16 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 	const b3SurfaceMaterial* materialB = b3GetShapeMaterials( shapeB );
 	b3Vec3 tangentVelocityA = b3Vec3_zero;
 
+	// Rolling resistance mixes as the max of the two materials, as in convex contacts, but per
+	// triangle like friction: a ball rolls on as each triangle's ground allows.
+	float rollingResistance = materialB->rollingResistance;
+
 	// Update friction and restitution if the mesh has per triangle material
 	if ( shapeA->materialCount > 0 )
 	{
 		float friction = 0.0f;
 		float restitution = 0.0f;
+		float rolling = 0.0f;
 		float stiffness = 0.0f;
 		float dampingRatio = 0.0f;
 		float sampleCount = 0.0f;
@@ -1139,6 +1144,7 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 													 materialB->userMaterialId );
 				restitution += world->restitutionCallback( material.restitution, material.userMaterialId, materialB->restitution,
 														   materialB->userMaterialId );
+				rolling += b3MaxFloat( material.rollingResistance, materialB->rollingResistance );
 
 				float sampleStiffness, sampleDampingRatio;
 				b3MixContactSpring( &material, materialB, &sampleStiffness, &sampleDampingRatio );
@@ -1156,6 +1162,7 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 			float invCount = 1.0f / sampleCount;
 			contact->friction = invCount * friction;
 			contact->restitution = invCount * restitution;
+			rollingResistance = invCount * rolling;
 			contact->contactStiffness = invCount * stiffness;
 			contact->contactDampingRatio = dampingRatio;
 			tangentVelocityA = b3MulSV( invCount, tangentVelocityA );
@@ -1172,6 +1179,7 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 		contact->restitution = world->restitutionCallback( materialsA[0].restitution, materialsA[0].userMaterialId,
 														   materialB->restitution, materialB->userMaterialId );
 		b3MixContactSpring( materialsA + 0, materialB, &contact->contactStiffness, &contact->contactDampingRatio );
+		rollingResistance = b3MaxFloat( materialsA[0].rollingResistance, materialB->rollingResistance );
 		tangentVelocityA = materialsA[0].tangentVelocity;
 	}
 
@@ -1191,7 +1199,7 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 		radiusB = shapeB->hull->innerRadius;
 	}
 
-	contact->rollingResistance = materialB->rollingResistance * radiusB;
+	contact->rollingResistance = rollingResistance * radiusB;
 
 	b3Vec3 tangentVelocityB = b3RotateVector( xfB.q, materialB->tangentVelocity );
 	contact->tangentVelocity = b3Sub( tangentVelocityA, tangentVelocityB );
