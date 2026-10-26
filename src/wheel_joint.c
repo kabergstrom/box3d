@@ -357,9 +357,9 @@ b3Vec3 b3GetWheelJointForce( b3World* world, b3JointSim* base )
 
 	// impulse in joint space
 	b3Vec3 impulse = {
+		joint->suspensionSpringImpulse + joint->lowerSuspensionImpulse - joint->upperSuspensionImpulse,
 		joint->linearImpulse.x,
 		joint->linearImpulse.y,
-		joint->lowerSuspensionLimit + joint->upperSuspensionImpulse + joint->suspensionSpringImpulse,
 	};
 
 	// convert impulse to force
