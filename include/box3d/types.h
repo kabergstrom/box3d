@@ -638,6 +638,9 @@ typedef enum b3JointType
 	b3_weldJoint,
 	b3_wheelJoint,
 	b3_ropeJoint,
+	/// Internal: ties a rope joint's third and fourth bodies to its first, so islands, sleep and
+	/// wake treat them as one. Never returned: b3Body_GetJoints reports the rope instead.
+	b3_ropeLinkJoint,
 } b3JointType;
 
 /// Base joint definition used by all joint types. The local frames are measured from the
@@ -1049,33 +1052,49 @@ B3_API b3WheelJointDef b3DefaultWheelJointDef( void );
 
 /// The most points a rope joint's path holds (both ends included).
 /// @ingroup rope_joint
-#define B3_MAX_ROPE_POINTS 8
+#define B3_MAX_ROPE_POINTS 16
 
-/// Rope joint definition. A rope runs along a path of points, each fixed on body A or
-/// body B: end, then any points it passes through (sheaves, pulleys, the edges of a
-/// lashed crate), then the other end. It slides through the inner points, and it only
-/// pulls: the constraint keeps the path's total length at most `length`. Without friction
-/// every segment carries the same tension. With friction at an inner point the rope grips
-/// it (capstan friction): it holds there until one side pulls more than e^(friction * wrap)
-/// times the other, wrap being the angle the path turns through at the point, and slips
-/// past that, losing energy as it goes. Bending stiffness and damping resist a segment
-/// turning on the body at either end of it (a hook swinging under its sheave). A static
-/// body stands in for the world. The base frames are unused (the points carry the
-/// attachments).
+/// The most bodies a rope joint ties (its path's points are fixed on them).
+/// @ingroup rope_joint
+#define B3_MAX_ROPE_BODIES 4
+
+/// Rope joint definition. A rope runs along a path of points, each fixed on one of up to
+/// B3_MAX_ROPE_BODIES bodies: end, then any points it passes through (sheaves, pulleys, the
+/// edges of a lashed crate, a bollard it is turned round, a cask's chimes), then the other end.
+/// It slides through the inner points, and it only pulls: the constraint keeps the path's total
+/// length at most `length`. Without friction every segment carries the same tension. With
+/// friction at an inner point the rope grips it (capstan friction): it holds there until one
+/// side pulls more than e^(friction * wrap) times the other, wrap being the angle the path turns
+/// through at the point, and slips past that, losing energy as it goes. Bending stiffness and
+/// damping resist a segment turning on the body at either end of it (a hook swinging under its
+/// sheave). A static body stands in for the world. The base frames are unused (the points carry
+/// the attachments).
+///
+/// Bodies: base.bodyIdA and base.bodyIdB are bodies 0 and 1, moreBodyIds[0] and [1] bodies 2 and
+/// 3 (b3_nullBodyId: none). The rope is one joint over all of them: their islands merge, they
+/// sleep and wake together, and b3Body_GetJoints reports the rope from each. When bodies 0 and 1
+/// are both non-dynamic, the first dynamic body among 2 and 3 trades places with body 0 (so the
+/// rope joint itself is solved): b3Joint_GetBodyA/B and b3RopeJoint_GetBodies then name the
+/// bodies in that order. Changing one of its bodies' type: create the rope again. A rope with
+/// more than two bodies lets them all collide with each other, whatever base.collideConnected
+/// says for bodies 0 and 1.
 /// @ingroup rope_joint
 typedef struct b3RopeJointDef
 {
-	/// Base joint definition
+	/// Base joint definition: bodies 0 and 1
 	b3JointDef base;
+
+	/// Bodies 2 and 3, b3_nullBodyId when unused.
+	b3BodyId moreBodyIds[2];
 
 	/// Points along the path, local to their body's origin.
 	b3Vec3 localPoints[B3_MAX_ROPE_POINTS];
 
+	/// The body each point is on: 0 and 1 base.bodyIdA and base.bodyIdB, 2 and 3 moreBodyIds.
+	uint8_t pointBodies[B3_MAX_ROPE_POINTS];
+
 	/// Number of points used, 2 to B3_MAX_ROPE_POINTS.
 	int pointCount;
-
-	/// Bit i set: point i is on body B, else on body A.
-	uint32_t bodyBMask;
 
 	/// Rope length: the most the path may measure. Clamped to a stable minimum value.
 	float length;

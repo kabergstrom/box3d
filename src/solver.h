@@ -229,6 +229,10 @@ typedef struct b3StepContext
 	b3ContactPrepareSpan* overflowSpans;
 	b3JointPrepareSpan* jointPrepareSpans;
 
+	// Rope joints' temporaries, indexed by rope id (ropeStepCount: world->ropes.count)
+	struct b3RopeStep* ropeSteps;
+	int ropeStepCount;
+
 	int activeColorCount;
 	int workerCount;
 

@@ -390,6 +390,7 @@ void b3DestroyBody( b3BodyId bodyId )
 	bool wakeBodies = true;
 
 	// Destroy the attached joints
+	b3DestroyBodyRopes( world, body, wakeBodies );
 	int edgeKey = body->headJointKey;
 	while ( edgeKey != B3_NULL_INDEX )
 	{
@@ -2623,11 +2624,37 @@ int b3Body_GetShapes( b3BodyId bodyId, b3ShapeId* shapeArray, int capacity )
 	return shapeCount;
 }
 
+// A rope's link joints are reported as their rope, once: a body sees a rope it is tied to,
+// whichever of the rope's bodies it is.
+static bool b3ReportedBefore( b3World* world, b3Body* body, int jointKey, int reported )
+{
+	for ( int key = body->headJointKey; key != jointKey; )
+	{
+		b3Joint* joint = b3Array_Get( world->joints, key >> 1 );
+		if ( b3ReportedJointId( world, joint ) == reported )
+		{
+			return true;
+		}
+		key = joint->edges[key & 1].nextKey;
+	}
+	return false;
+}
+
 int b3Body_GetJointCount( b3BodyId bodyId )
 {
 	b3World* world = b3GetWorld( bodyId.world0 );
 	b3Body* body = b3ReadBodyFullId( world, bodyId );
-	return body->jointCount;
+	int jointCount = 0;
+	for ( int jointKey = body->headJointKey; jointKey != B3_NULL_INDEX; )
+	{
+		b3Joint* joint = b3Array_Get( world->joints, jointKey >> 1 );
+		if ( joint->ropeId == B3_NULL_INDEX || b3ReportedBefore( world, body, jointKey, b3ReportedJointId( world, joint ) ) == false )
+		{
+			jointCount += 1;
+		}
+		jointKey = joint->edges[jointKey & 1].nextKey;
+	}
+	return jointCount;
 }
 
 int b3Body_GetJoints( b3BodyId bodyId, b3JointId* jointArray, int capacity )
@@ -2643,10 +2670,14 @@ int b3Body_GetJoints( b3BodyId bodyId, b3JointId* jointArray, int capacity )
 		int edgeIndex = jointKey & 1;
 
 		b3Joint* joint = b3Array_Get( world->joints, jointId );
-
-		b3JointId id = { jointId + 1, bodyId.world0, joint->generation };
-		jointArray[jointCount] = id;
-		jointCount += 1;
+		int reported = b3ReportedJointId( world, joint );
+		if ( joint->ropeId == B3_NULL_INDEX || b3ReportedBefore( world, body, jointKey, reported ) == false )
+		{
+			b3Joint* reportedJoint = b3Array_Get( world->joints, reported );
+			b3JointId id = { reported + 1, bodyId.world0, reportedJoint->generation };
+			jointArray[jointCount] = id;
+			jointCount += 1;
+		}
 
 		jointKey = joint->edges[edgeIndex].nextKey;
 	}

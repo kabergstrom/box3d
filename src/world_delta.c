@@ -69,7 +69,7 @@ enum
 	b3_dtPairItems,
 	b3_dtEvents,
 	b3_dtPool0,
-	b3_dtTreeHeader0 = b3_dtPool0 + 6,
+	b3_dtTreeHeader0 = b3_dtPool0 + 7,
 	b3_dtTreeNodes0 = b3_dtTreeHeader0 + b3_bodyTypeCount,
 	b3_dtTreeParents0 = b3_dtTreeNodes0 + b3_bodyTypeCount,
 	b3_dtTreeProxies0 = b3_dtTreeParents0 + b3_bodyTypeCount,
@@ -79,6 +79,7 @@ enum
 	b3_dtJoint,
 	b3_dtIsland,
 	b3_dtSet,
+	b3_dtRope,
 	b3_dtCount
 };
 
@@ -91,6 +92,7 @@ enum
 	b3_deJoint,
 	b3_deIsland,
 	b3_deSet,
+	b3_deRope,
 	b3_deCount
 };
 
@@ -477,6 +479,8 @@ static int b3DeltaSlotCount( b3World* world, int table )
 			return world->islands.count;
 		case b3_dtSet:
 			return world->solverSets.count;
+		case b3_dtRope:
+			return world->ropes.count;
 		default:
 			break;
 	}
@@ -515,6 +519,8 @@ static b3IdPool* b3DeltaPool( b3World* world, int element )
 			return &world->jointIdPool;
 		case b3_deIsland:
 			return &world->islandIdPool;
+		case b3_deRope:
+			return &world->ropeIdPool;
 		default:
 			return &world->solverSetIdPool;
 	}
@@ -755,6 +761,10 @@ static const uint8_t* b3DeltaImage( b3WorldDelta* d, int table, int index, int* 
 		case b3_dtJoint:
 			*len = sizeof( b3Joint );
 			return (const uint8_t*)( world->joints.data + index );
+
+		case b3_dtRope:
+			*len = sizeof( b3RopeData );
+			return (const uint8_t*)( world->ropes.data + index );
 
 		case b3_dtIsland:
 		{
@@ -1201,6 +1211,17 @@ static void b3DeltaApply( b3WorldDelta* d, int table, int index, const uint8_t* 
 			b3DeltaApplySet( world, index, p, len );
 			return;
 
+		case b3_dtRope:
+			if ( len == B3_DELTA_ABSENT )
+			{
+				memset( world->ropes.data + index, 0, sizeof( b3RopeData ) );
+			}
+			else
+			{
+				memcpy( world->ropes.data + index, p, sizeof( b3RopeData ) );
+			}
+			return;
+
 		default:
 			break;
 	}
@@ -1320,6 +1341,16 @@ static void b3DeltaAdd( b3WorldDelta* d, int element, int id )
 	if ( id < 0 )
 	{
 		return;
+	}
+
+	// A rope's state is out of line: it is a candidate whenever its joint or a link of it is
+	if ( element == b3_deJoint && id < d->world->joints.count )
+	{
+		b3Joint* joint = d->world->joints.data + id;
+		if ( joint->jointId == id && joint->ropeId != B3_NULL_INDEX )
+		{
+			b3DeltaAdd( d, b3_deRope, joint->ropeId );
+		}
 	}
 
 	if ( d->markMode )
@@ -1451,6 +1482,10 @@ static void b3DeltaAddLinks( b3WorldDelta* d, int table, const uint8_t* bytes, i
 		memcpy( &joint, bytes, sizeof( b3Joint ) );
 		b3DeltaAddLink( d, b3_deSet, joint.setIndex );
 		b3DeltaAddLink( d, b3_deIsland, joint.islandId );
+		if ( joint.ropeId != B3_NULL_INDEX )
+		{
+			b3DeltaAddLink( d, b3_deRope, joint.ropeId );
+		}
 		for ( int i = 0; i < 2; ++i )
 		{
 			b3JointEdge* edge = joint.edges + i;
@@ -1903,7 +1938,7 @@ static void b3DeltaCaptureInto( b3WorldDelta* d, b3DeltaBuffer* log )
 	// Candidate elements. A changed set or island adds its moved members, a changed shape, contact or
 	// joint adds its list neighbors and owners, so compare until no table grows. Containers go first so
 	// most additions land before their table's pass.
-	static const int order[b3_deCount] = { b3_deSet, b3_deIsland, b3_deBody, b3_deShape, b3_deContact, b3_deJoint };
+	static const int order[b3_deCount] = { b3_deSet, b3_deIsland, b3_deBody, b3_deShape, b3_deContact, b3_deJoint, b3_deRope };
 	int cursors[b3_deCount] = { 0 };
 	for ( ;; )
 	{
@@ -1946,7 +1981,7 @@ static void b3DeltaCaptureInto( b3WorldDelta* d, b3DeltaBuffer* log )
 				{
 					if ( d->stats.missCount < B3_DELTA_MAX_MISS_LOGS )
 					{
-						static const char* names[b3_deCount] = { "body", "shape", "contact", "joint", "island", "set" };
+						static const char* names[b3_deCount] = { "body", "shape", "contact", "joint", "island", "set", "rope" };
 						b3Log( "b3WorldDelta: missed %s %d at step %" PRIu64 " first diff at byte %d", names[i], j,
 							   world->stepIndex, d->lastDiffOffset );
 					}
@@ -2065,6 +2100,7 @@ static void b3DeltaGrowElementTables( b3World* world, const b3DeltaCounts* count
 	B3_GROW_TABLE( world->joints, counts->counts[b3_deJoint] );
 	B3_GROW_TABLE( world->islands, counts->counts[b3_deIsland] );
 	B3_GROW_TABLE( world->solverSets, counts->counts[b3_deSet] );
+	B3_GROW_TABLE( world->ropes, counts->counts[b3_deRope] );
 
 #undef B3_GROW_TABLE
 }
@@ -2079,6 +2115,7 @@ static void b3DeltaTruncateElementTables( b3World* world, const b3DeltaCounts* c
 	world->joints.count = counts->counts[b3_deJoint];
 	world->islands.count = counts->counts[b3_deIsland];
 	world->solverSets.count = counts->counts[b3_deSet];
+	world->ropes.count = counts->counts[b3_deRope];
 }
 
 static bool b3DeltaIsHeader( int table, int index )
@@ -2372,9 +2409,9 @@ void b3DeltaPrintTableBytes( const b3WorldDelta* d )
 {
 	static const char* names[b3_dtCount] = {
 		"world",	 "counts",	   "names",		 "sensors",		"colors",	   "pairHeader", "pairItems", "moveEvents",
-		"poolBody",	 "poolShape",  "poolContact", "poolJoint",	"poolIsland",  "poolSet",	 "treeHdr0",  "treeHdr1",
+		"poolBody",	 "poolShape",  "poolContact", "poolJoint",	"poolIsland",  "poolSet",  "poolRope",	 "treeHdr0",  "treeHdr1",
 		"treeHdr2",	 "treeNodes0", "treeNodes1", "treeNodes2", "treeParents0", "treeParents1", "treeParents2",
-		"treeProxies0", "treeProxies1", "treeProxies2", "body", "shape", "contact", "joint", "island", "set",
+		"treeProxies0", "treeProxies1", "treeProxies2", "body", "shape", "contact", "joint", "island", "set", "rope",
 	};
 	for ( int i = 0; i < b3_dtCount; ++i )
 	{

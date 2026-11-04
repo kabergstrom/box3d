@@ -51,7 +51,8 @@ typedef struct b3World b3World;
 // Major version 7 added the contact spring to the surface material.
 // Major version 8 widened the rope joint def with friction.
 // Major version 9 widened the rope joint def with bending.
-#define B3_REC_VERSION_MAJOR 9
+// Major version 10 widened the rope joint def to 16 points on up to 4 bodies.
+#define B3_REC_VERSION_MAJOR 10
 
 // Minor tracks op-stream additions that keep the 48 byte header shape.
 // Minor version 7 made the contact body sim locators persistent

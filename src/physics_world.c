@@ -305,6 +305,9 @@ b3WorldId b3CreateWorld( const b3WorldDef* def )
 	world->jointIdPool = b3CreateIdPool();
 	b3Array_Reserve( world->joints, 16 );
 
+	world->ropeIdPool = b3CreateIdPool();
+	b3Array_Create( world->ropes );
+
 	world->islandIdPool = b3CreateIdPool();
 	b3Array_Reserve( world->islands, b3MaxInt( 16, def->capacity.dynamicBodyCount ) );
 
@@ -493,6 +496,7 @@ void b3DestroyWorld( b3WorldId worldId )
 	b3Array_Destroy( world->fatAABBs );
 	b3Array_Destroy( world->contacts );
 	b3Array_Destroy( world->joints );
+	b3Array_Destroy( world->ropes );
 
 	for ( int i = 0; i < world->islands.count; ++i )
 	{
@@ -522,6 +526,7 @@ void b3DestroyWorld( b3WorldId worldId )
 	b3DestroyIdPool( &world->shapeIdPool );
 	b3DestroyIdPool( &world->contactIdPool );
 	b3DestroyIdPool( &world->jointIdPool );
+	b3DestroyIdPool( &world->ropeIdPool );
 	b3DestroyIdPool( &world->islandIdPool );
 	b3DestroyIdPool( &world->solverSetIdPool );
 

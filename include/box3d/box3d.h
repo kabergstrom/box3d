@@ -1865,8 +1865,9 @@ B3_API float b3WheelJoint_GetSteeringTorque( b3JointId jointId );
 
 /**
  * @defgroup rope_joint Rope Joint
- * A rope along a path of points on two bodies: its ends and the points it runs through
- * (sheaves, pulleys, edges it is lashed over). It slides through the inner points, held
+ * A rope along a path of points on up to B3_MAX_ROPE_BODIES bodies: its ends and the points
+ * it runs through (sheaves, pulleys, edges it is lashed over, a bollard or cask it is turned
+ * round). It slides through the inner points, held
  * by each one's friction (capstan: the segments either side differ in tension by at most
  * e^(friction * wrap)); without friction every segment pulls with the same tension. It
  * only pulls (slack: no force). Taut, it stretches with its axial stiffness. Winch or
@@ -1937,6 +1938,14 @@ B3_API int b3RopeJoint_GetSlipEnergies( b3JointId jointId, float* energies, int 
 
 /// The number of points of the path.
 B3_API int b3RopeJoint_GetPointCount( b3JointId jointId );
+
+/// The bodies the rope ties, at most capacity, in the rope's order (which may differ from its
+/// def's: see b3RopeJointDef). @returns the number of bodies stored
+B3_API int b3RopeJoint_GetBodies( b3JointId jointId, b3BodyId* bodies, int capacity );
+
+/// Each point's body, as an index into b3RopeJoint_GetBodies, at most capacity.
+/// @returns the number of points stored
+B3_API int b3RopeJoint_GetPointBodies( b3JointId jointId, int* bodies, int capacity );
 
 /// The path's points in world space, at most `capacity`. Returns the number written.
 B3_API int b3RopeJoint_GetWorldPoints( b3JointId jointId, b3Pos* points, int capacity );

@@ -631,12 +631,17 @@ b3RopeJointDef b3RecR_ROPEJOINTDEF( b3RecReader* rdr )
 {
 	b3RopeJointDef def = b3DefaultRopeJointDef();
 	b3RecR_JointBase( rdr, &def.base );
+	def.moreBodyIds[0] = b3RecR_BODYID( rdr );
+	def.moreBodyIds[1] = b3RecR_BODYID( rdr );
 	def.pointCount = b3RecR_I32( rdr );
 	for ( int i = 0; i < B3_MAX_ROPE_POINTS; ++i )
 	{
 		def.localPoints[i] = b3RecR_VEC3( rdr );
 	}
-	def.bodyBMask = b3RecR_U32( rdr );
+	for ( int i = 0; i < B3_MAX_ROPE_POINTS; ++i )
+	{
+		def.pointBodies[i] = b3RecR_U8( rdr );
+	}
 	def.length = b3RecR_F32( rdr );
 	def.stiffness = b3RecR_F32( rdr );
 	def.dampingRatio = b3RecR_F32( rdr );
@@ -1321,6 +1326,13 @@ static void b3RecDispatch_CreateRopeJoint( const b3RecArgs_CreateRopeJoint* a, b
 	b3RopeJointDef def = a->def;
 	def.base.bodyIdA = b3RecMakeBodyId( rdr, def.base.bodyIdA );
 	def.base.bodyIdB = b3RecMakeBodyId( rdr, def.base.bodyIdB );
+	for ( int k = 0; k < 2; ++k )
+	{
+		if ( B3_IS_NULL( def.moreBodyIds[k] ) == false )
+		{
+			def.moreBodyIds[k] = b3RecMakeBodyId( rdr, def.moreBodyIds[k] );
+		}
+	}
 	b3RecCheckJointId( rdr, b3CreateRopeJoint( rdr->replayWorldId, &def ), recId );
 }
 

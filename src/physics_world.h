@@ -31,6 +31,7 @@ b3DeclareArray( b3BlockAllocator );
 b3DeclareArray( b3Body );
 b3DeclareArray( b3SolverSet );
 b3DeclareArray( b3Joint );
+b3DeclareArray( b3RopeData );
 b3DeclareArray( b3Contact );
 b3DeclareArray( b3Island );
 b3DeclareArray( b3AABB );
@@ -158,6 +159,12 @@ typedef struct b3World
 	// This is a sparse array that maps joint ids to the joint data stored in the constraint graph
 	// or in the solver sets.
 	b3Array( b3Joint ) joints;
+
+	// Used to create stable ids for ropes
+	b3IdPool ropeIdPool;
+
+	// Rope joints' out of line state (b3RopeData), a sparse array indexed by rope id
+	b3Array( b3RopeData ) ropes;
 
 	// Used to create stable ids for contacts
 	b3IdPool contactIdPool;

@@ -347,7 +347,7 @@ _Static_assert( sizeof( void* ) != 8 || sizeof( b3WeldJointDef ) == 128,
 				"b3WeldJointDef changed: update b3RecW_WELDJOINTDEF and its reader together" );
 _Static_assert( sizeof( void* ) != 8 || sizeof( b3WheelJointDef ) == 184,
 				"b3WheelJointDef changed: update b3RecW_WHEELJOINTDEF and its reader together" );
-_Static_assert( sizeof( void* ) != 8 || sizeof( b3RopeJointDef ) == 272,
+_Static_assert( sizeof( void* ) != 8 || sizeof( b3RopeJointDef ) == 424,
 				"b3RopeJointDef changed: update b3RecW_ROPEJOINTDEF and its reader together" );
 
 void b3RecW_EXPLOSIONDEF( b3RecBuffer* buf, b3ExplosionDef v )
@@ -536,12 +536,17 @@ void b3RecW_WELDJOINTDEF( b3RecBuffer* buf, b3WeldJointDef v )
 void b3RecW_ROPEJOINTDEF( b3RecBuffer* buf, b3RopeJointDef v )
 {
 	b3RecW_JointBase( buf, &v.base );
+	b3RecW_BODYID( buf, v.moreBodyIds[0] );
+	b3RecW_BODYID( buf, v.moreBodyIds[1] );
 	b3RecW_I32( buf, v.pointCount );
 	for ( int i = 0; i < B3_MAX_ROPE_POINTS; ++i )
 	{
 		b3RecW_VEC3( buf, v.localPoints[i] );
 	}
-	b3RecW_U32( buf, v.bodyBMask );
+	for ( int i = 0; i < B3_MAX_ROPE_POINTS; ++i )
+	{
+		b3RecW_U8( buf, v.pointBodies[i] );
+	}
 	b3RecW_F32( buf, v.length );
 	b3RecW_F32( buf, v.stiffness );
 	b3RecW_F32( buf, v.dampingRatio );
@@ -1298,7 +1303,7 @@ static uint32_t b3SetCategory( int setIndex )
 	return (uint32_t)( setIndex < b3_firstSleepingSet ? setIndex : b3_firstSleepingSet );
 }
 
-static void b3HashJointImpulses( b3StateHasher* h, const b3JointSim* sim )
+static void b3HashJointImpulses( b3StateHasher* h, const b3JointSim* sim, const b3RopeData* rope )
 {
 	switch ( sim->type )
 	{
@@ -1346,8 +1351,15 @@ static void b3HashJointImpulses( b3StateHasher* h, const b3JointSim* sim )
 			b3HashVec3( h, sim->weldJoint.angularImpulse );
 			break;
 		case b3_ropeJoint:
-			b3HashF32( h, sim->ropeJoint.impulse );
-			b3HashF32( h, sim->ropeJoint.length );
+			if ( rope != NULL )
+			{
+				b3HashF32( h, rope->impulse );
+				b3HashF32( h, rope->length );
+				for ( int i = 0; i < rope->pointCount; ++i )
+				{
+					b3HashF32( h, rope->frictionImpulse[i] );
+				}
+			}
 			break;
 		case b3_wheelJoint:
 			b3HashVec2( h, sim->wheelJoint.linearImpulse );
@@ -1432,7 +1444,7 @@ uint64_t b3World_GetStateHash( b3WorldId worldId )
 		b3JointSim* sim = b3GetJointSim( world, joint );
 		b3HashU32( &h, (uint32_t)sim->bodyIdA );
 		b3HashU32( &h, (uint32_t)sim->bodyIdB );
-		b3HashJointImpulses( &h, sim );
+		b3HashJointImpulses( &h, sim, sim->type == b3_ropeJoint ? b3GetRopeData( world, sim ) : NULL );
 	}
 
 	return h.hash;

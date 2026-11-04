@@ -33,7 +33,7 @@
 
 // Snapshot image magic 'BNS3' and version
 #define B3_SNAP_MAGIC 0x33534E42u
-#define B3_SNAP_VERSION 10u // post solve restitution
+#define B3_SNAP_VERSION 11u // ropes out of line (b3RopeData), up to 4 bodies and 16 points
 
 #define B3_SNAP_FLAG_VALIDATION 0x1u
 #define B3_SNAP_FLAG_DOUBLE_PRECISION 0x2u
@@ -54,6 +54,7 @@ static uint32_t b3ComputeLayoutHash( void )
 	MIX( sizeof( b3Manifold ) )
 	MIX( sizeof( b3Joint ) )
 	MIX( sizeof( b3JointSim ) )
+	MIX( sizeof( b3RopeData ) )
 	MIX( sizeof( b3Island ) )
 	MIX( sizeof( b3IslandSim ) )
 	MIX( sizeof( b3ContactLink ) )
@@ -1031,13 +1032,14 @@ int b3SerializeWorld( b3World* world, b3RecBuffer* buf, b3Recording* rec )
 	// World scalars
 	b3SerWorldConfig( buf, world );
 
-	// 6 id pools (Box3D has no chainIdPool)
+	// 7 id pools (Box3D has no chainIdPool)
 	b3SerIdPool( buf, &world->bodyIdPool );
 	b3SerIdPool( buf, &world->shapeIdPool );
 	b3SerIdPool( buf, &world->contactIdPool );
 	b3SerIdPool( buf, &world->jointIdPool );
 	b3SerIdPool( buf, &world->islandIdPool );
 	b3SerIdPool( buf, &world->solverSetIdPool );
+	b3SerIdPool( buf, &world->ropeIdPool );
 
 	// Solver sets
 	int setCount = world->solverSets.count;
@@ -1078,6 +1080,9 @@ int b3SerializeWorld( b3World* world, b3RecBuffer* buf, b3Recording* rec )
 			b3SnapW_Bytes( buf, &elem, sizeof( b3Joint ) );
 		}
 	}
+
+	// Rope sparse array (plain data)
+	b3SerPodArray( buf, world->ropes );
 
 	// Sensors: shapeId + 3 inner arrays each
 	{
@@ -1175,13 +1180,14 @@ bool b3DeserializeIntoShell( const uint8_t* data, int size, b3World* world, b3Re
 	// 1. World scalars
 	b3DesWorldConfig( r, world );
 
-	// 2. 6 id pools; destroy the pre-created sets' pool state first
+	// 2. 7 id pools; destroy the pre-created sets' pool state first
 	b3DesIdPool( r, &world->bodyIdPool );
 	b3DesIdPool( r, &world->shapeIdPool );
 	b3DesIdPool( r, &world->contactIdPool );
 	b3DesIdPool( r, &world->jointIdPool );
 	b3DesIdPool( r, &world->islandIdPool );
 	b3DesIdPool( r, &world->solverSetIdPool );
+	b3DesIdPool( r, &world->ropeIdPool );
 
 	// 3. Solver sets: destroy inner arrays of existing sets first
 	for ( int i = 0; i < world->solverSets.count; ++i )
@@ -1277,6 +1283,9 @@ bool b3DeserializeIntoShell( const uint8_t* data, int size, b3World* world, b3Re
 			}
 		}
 	}
+
+	// 7b. Rope sparse array
+	b3DesPodArray( r, world->ropes );
 
 	// 8. Sensors
 	{

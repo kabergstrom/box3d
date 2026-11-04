@@ -8,6 +8,7 @@
 
 #include "box3d/types.h"
 
+typedef struct b3Body b3Body;
 typedef struct b3DebugDraw b3DebugDraw;
 typedef struct b3StepContext b3StepContext;
 typedef struct b3World b3World;
@@ -45,6 +46,9 @@ typedef struct b3Joint
 
 	int jointId;
 	int islandId;
+
+	// The rope (world->ropes) of a rope joint or rope link joint, B3_NULL_INDEX otherwise
+	int ropeId;
 
 	// Index into the island's joints array for O(1) swap-removal.
 	// B3_NULL_INDEX when not in an island.
@@ -304,12 +308,34 @@ typedef struct b3WheelJoint
 	bool enableSteeringMotor;
 } b3WheelJoint;
 
+// A rope joint's sim holds only its rope's id: the rope's state lives out of line in
+// world->ropes (b3RopeData), so the joint union stays the size of the other joints.
 typedef struct b3RopeJoint
 {
-	// Points local to their body's origin; bit i of bodyBMask: point i is on body B
+	// Also indexes this step's temporaries (b3RopeStep) in the step context
+	int ropeId;
+} b3RopeJoint;
+
+// A rope's persistent state, indexed by ropeId (world->ropeIdPool). Bodies 0 and 1 are the
+// rope joint's own A and B; bodies 2 and 3 are tied to body 0 (body 1 when 0 is not dynamic) by
+// link joints (b3_ropeLinkJoint) that exist only so islands, sleep and wake treat the rope's
+// bodies as connected. A two-body rope solves in its graph color like any joint; with more
+// bodies the rope and its links solve in the overflow color.
+typedef struct b3RopeData
+{
+	// The rope joint, B3_NULL_INDEX when the slot is free
+	int jointId;
+
+	int bodyCount;
+	int bodyIds[B3_MAX_ROPE_BODIES];
+
+	// The link joint tying body k (k >= 2) to the rope, B3_NULL_INDEX for k < 2 or unused
+	int linkJointIds[B3_MAX_ROPE_BODIES];
+
+	// Points local to their body's origin; pointBodies[i]: the body (0..bodyCount-1) point i is on
 	b3Vec3 localPoints[B3_MAX_ROPE_POINTS];
+	uint8_t pointBodies[B3_MAX_ROPE_POINTS];
 	int pointCount;
-	uint32_t bodyBMask;
 
 	float length;
 	float stiffness;
@@ -336,23 +362,29 @@ typedef struct b3RopeJoint
 
 	// Energy friction took at each inner point over the last step (joules)
 	float slipEnergy[B3_MAX_ROPE_POINTS];
+} b3RopeData;
 
-	// Solver temporaries: points relative to their body's center of mass in world space
-	// at the start of the step, the centers' separation, the soft tuning, and each inner
-	// point's capstan bounds on its friction impulse per unit tension beyond it (the
-	// segments before it tighter, or slacker)
-	int indexA;
-	int indexB;
+// A rope's step temporaries, on the step's stack (never captured): per body its awake state
+// index, inverse mass and world inertia, and its center relative to body 0's at the start of
+// the step; per point its position relative to its body's center in world space then; the
+// soft tuning; each inner point's capstan bounds on its friction impulse per unit tension
+// beyond it (the segments before it tighter, or slacker); the rest directions in world space.
+typedef struct b3RopeStep
+{
+	b3RopeData* rope;
+	int bodyCount;
+	int index[B3_MAX_ROPE_BODIES];
+	float invMass[B3_MAX_ROPE_BODIES];
+	b3Matrix3 invI[B3_MAX_ROPE_BODIES];
+	b3Vec3 deltaCenter[B3_MAX_ROPE_BODIES];
 	b3Vec3 anchors[B3_MAX_ROPE_POINTS];
-	b3Vec3 deltaCenter;
 	b3Softness softness;
 	bool soft;
 	float gripTighter[B3_MAX_ROPE_POINTS];
 	float gripSlacker[B3_MAX_ROPE_POINTS];
-	// The rest directions in world space at the start of the step
 	b3Vec3 restStartWorld[B3_MAX_ROPE_POINTS];
 	b3Vec3 restEndWorld[B3_MAX_ROPE_POINTS];
-} b3RopeJoint;
+} b3RopeStep;
 
 /// The base joint class. Joints are used to constraint two bodies together in
 /// various fashions. Some joints also feature limits and motors.
@@ -397,6 +429,8 @@ typedef struct b3JointSim
 } b3JointSim;
 
 void b3DestroyJointInternal( b3World* world, b3Joint* joint, bool wakeBodies );
+void b3DestroyBodyRopes( b3World* world, b3Body* body, bool wakeBodies );
+int b3ReportedJointId( b3World* world, b3Joint* joint );
 
 b3Joint* b3GetJointFullId( b3World* world, b3JointId jointId );
 b3Joint* b3ReadJointFullId( b3World* world, b3JointId jointId );
@@ -470,7 +504,8 @@ void b3DrawRevoluteJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform 
 void b3DrawSphericalJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB, float scale );
 void b3DrawWeldJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB, float scale );
 void b3DrawWheelJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB, float scale );
-void b3DrawRopeJoint( b3DebugDraw* draw, b3JointSim* base, b3WorldTransform transformA, b3WorldTransform transformB );
+void b3DrawRopeJoint( b3DebugDraw* draw, b3World* world, b3JointSim* base );
 float b3GetRopeJointLength( b3World* world, b3JointSim* base );
-float b3GetRopeJointMaxImpulse( const b3RopeJoint* joint );
-void b3SetRopeJointRest( b3World* world, b3JointSim* base );
+float b3GetRopeJointMaxImpulse( const b3RopeData* rope );
+void b3SetRopeJointRest( b3World* world, b3RopeData* rope );
+b3RopeData* b3GetRopeData( b3World* world, b3JointSim* base );

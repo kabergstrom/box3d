@@ -1583,6 +1583,11 @@ void b3Solve( b3World* world, b3StepContext* stepContext )
 		overflow->manifoldConstraints = (b3ManifoldConstraint*)b3StackAlloc(
 			&world->stack, overflowManifoldCount * sizeof( b3ManifoldConstraint ), "overflow manifolds" );
 
+		// Rope temporaries, by rope id
+		stepContext->ropeStepCount = world->ropes.count;
+		stepContext->ropeSteps = (struct b3RopeStep*)b3StackAlloc(
+			&world->stack, b3MaxInt( world->ropes.count, 1 ) * sizeof( b3RopeStep ), "rope steps" );
+
 		// Build the span table for the flat prepare/store parallel-for while I slice the
 		// wide constraint buffer across colors. One entry per active color plus a sentinel
 		// at wideContactCount.
@@ -1898,6 +1903,8 @@ void b3Solve( b3World* world, b3StepContext* stepContext )
 		b3StackFree( &world->stack, convexBlocks );
 		b3StackFree( &world->stack, bodyBlocks );
 		b3StackFree( &world->stack, stages );
+		b3StackFree( &world->stack, stepContext->ropeSteps );
+		stepContext->ropeSteps = NULL;
 		b3StackFree( &world->stack, overflow->manifoldConstraints );
 		b3StackFree( &world->stack, overflow->contactConstraints );
 		b3StackFree( &world->stack, manifoldConstraints );

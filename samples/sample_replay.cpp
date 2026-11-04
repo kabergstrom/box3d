@@ -96,6 +96,8 @@ static const char* ReplayJointTypeName( b3JointType type )
 			return "wheel";
 		case b3_ropeJoint:
 			return "rope";
+		case b3_ropeLinkJoint:
+			return "rope link";
 		default:
 			return "?";
 	}

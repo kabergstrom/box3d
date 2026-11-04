@@ -283,7 +283,21 @@ b3JointSim* b3CreateJointInGraph( b3World* world, b3Joint* joint )
 	b3Body* bodyA = b3Array_Get( world->bodies, bodyIdA );
 	b3Body* bodyB = b3Array_Get( world->bodies, bodyIdB );
 
-	int colorIndex = b3AssignJointColor( graph, bodyIdA, bodyIdB, bodyA->type, bodyB->type );
+	// A rope over more than two bodies moves the bodies of its links too, which coloring does not
+	// see: it and its links solve in the overflow color (single threaded, in array order). A
+	// two-body rope colors like any joint.
+	bool overflow = joint->type == b3_ropeLinkJoint;
+	if ( joint->type == b3_ropeJoint )
+	{
+		B3_ASSERT( joint->ropeId != B3_NULL_INDEX );
+		overflow = b3Array_Get( world->ropes, joint->ropeId )->bodyCount > 2;
+	}
+
+	int colorIndex = B3_OVERFLOW_INDEX;
+	if ( overflow == false )
+	{
+		colorIndex = b3AssignJointColor( graph, bodyIdA, bodyIdB, bodyA->type, bodyB->type );
+	}
 
 	b3JointSim* jointSim = b3Array_Emplace( graph->colors[colorIndex].jointSims );
 	memset( jointSim, 0, sizeof( b3JointSim ) );

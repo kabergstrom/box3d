@@ -115,8 +115,10 @@ b3RopeJointDef b3DefaultRopeJointDef( void )
 {
 	b3RopeJointDef def = { 0 };
 	def.base = b3DefaultJointDef();
+	def.moreBodyIds[0] = b3_nullBodyId;
+	def.moreBodyIds[1] = b3_nullBodyId;
 	def.pointCount = 2;
-	def.bodyBMask = 2u;
+	def.pointBodies[1] = 1;
 	def.length = 1.0f;
 	def.dampingRatio = 1.0f;
 	return def;
@@ -232,7 +234,9 @@ typedef struct b3JointPair
 	b3JointSim* jointSim;
 } b3JointPair;
 
-static b3JointPair b3CreateJoint( b3World* world, const b3JointDef* def, b3JointType type )
+// ropeId: the rope a rope or rope link joint belongs to (set before the joint joins the graph), else
+// B3_NULL_INDEX.
+static b3JointPair b3CreateJoint( b3World* world, const b3JointDef* def, b3JointType type, int ropeId )
 {
 	B3_ASSERT( b3IsValidTransform( def->localFrameA ) );
 	B3_ASSERT( b3IsValidTransform( def->localFrameB ) );
@@ -273,6 +277,7 @@ static b3JointPair b3CreateJoint( b3World* world, const b3JointDef* def, b3Joint
 	joint->drawScale = def->drawScale;
 	joint->type = type;
 	joint->collideConnected = def->collideConnected;
+	joint->ropeId = ropeId;
 
 	// Doubly linked list on bodyA
 	joint->edges[0].bodyId = bodyIdA;
@@ -492,7 +497,7 @@ b3JointId b3CreateDistanceJoint( b3WorldId worldId, const b3DistanceJointDef* de
 	B3_ASSERT( b3IsValidFloat( def->length ) && def->length > 0.0f );
 	B3_ASSERT( def->lowerSpringForce <= def->upperSpringForce );
 
-	b3JointPair pair = b3CreateJoint( world, &def->base, b3_distanceJoint );
+	b3JointPair pair = b3CreateJoint( world, &def->base, b3_distanceJoint, B3_NULL_INDEX );
 
 	b3JointSim* joint = pair.jointSim;
 
@@ -531,42 +536,140 @@ b3JointId b3CreateRopeJoint( b3WorldId worldId, const b3RopeJointDef* def )
 	B3_ASSERT( 2 <= def->pointCount && def->pointCount <= B3_MAX_ROPE_POINTS );
 	B3_ASSERT( b3IsValidFloat( def->length ) && def->length > 0.0f );
 
-	// The base frames sit at the ends (generic joint queries and drawing).
-	b3JointDef jointDef = def->base;
+	// The bodies, def slots 2 and 3 compacted after 0 and 1
+	b3BodyId bodyIds[B3_MAX_ROPE_BODIES] = { def->base.bodyIdA, def->base.bodyIdB };
+	int slotIndex[B3_MAX_ROPE_BODIES] = { 0, 1, B3_NULL_INDEX, B3_NULL_INDEX };
+	int bodyCount = 2;
+	for ( int k = 0; k < 2; ++k )
+	{
+		if ( B3_IS_NULL( def->moreBodyIds[k] ) == false )
+		{
+			slotIndex[2 + k] = bodyCount;
+			bodyIds[bodyCount] = def->moreBodyIds[k];
+			bodyCount += 1;
+		}
+	}
+	bool dynamic[B3_MAX_ROPE_BODIES];
+	for ( int k = 0; k < bodyCount; ++k )
+	{
+		B3_ASSERT( world->worldId == bodyIds[k].world0 );
+		dynamic[k] = b3GetBodyFullId( world, bodyIds[k] )->type == b3_dynamicBody;
+		for ( int other = 0; other < k; ++other )
+		{
+			if ( B3_ID_EQUALS( bodyIds[k], bodyIds[other] ) )
+			{
+				B3_ASSERT( false && "a rope's bodies must differ" );
+				return (b3JointId){ 0 };
+			}
+		}
+	}
+
+	// Body 0 or 1 dynamic whenever any is, so the rope joint (between them) is solved and its
+	// links tie to a dynamic body: else the first dynamic body takes slot 0. Two bodies keep
+	// their order.
+	int order[B3_MAX_ROPE_BODIES] = { 0, 1, 2, 3 };
+	if ( dynamic[0] == false && dynamic[1] == false )
+	{
+		for ( int k = 2; k < bodyCount; ++k )
+		{
+			if ( dynamic[k] )
+			{
+				order[0] = k;
+				order[k] = 0;
+				break;
+			}
+		}
+	}
+	int rank[B3_MAX_ROPE_BODIES];
+	for ( int k = 0; k < bodyCount; ++k )
+	{
+		rank[order[k]] = k;
+	}
+
 	int count = b3ClampInt( def->pointCount, 2, B3_MAX_ROPE_POINTS );
-	b3Vec3 first = def->localPoints[0];
-	b3Vec3 last = def->localPoints[count - 1];
-	jointDef.localFrameA = (b3Transform){ ( def->bodyBMask & 1u ) ? b3Vec3_zero : first, b3Quat_identity };
-	jointDef.localFrameB = (b3Transform){ ( def->bodyBMask >> ( count - 1 ) ) & 1u ? last : b3Vec3_zero, b3Quat_identity };
-
-	b3JointPair pair = b3CreateJoint( world, &jointDef, b3_ropeJoint );
-
-	b3JointSim* joint = pair.jointSim;
-
-	joint->ropeJoint = (b3RopeJoint){ 0 };
+	uint8_t pointBodies[B3_MAX_ROPE_POINTS] = { 0 };
 	for ( int i = 0; i < count; ++i )
 	{
-		joint->ropeJoint.localPoints[i] = def->localPoints[i];
+		int slot = def->pointBodies[i];
+		if ( slot >= B3_MAX_ROPE_BODIES || slotIndex[slot] == B3_NULL_INDEX )
+		{
+			B3_ASSERT( false && "a rope point is on a body the rope does not have" );
+			return (b3JointId){ 0 };
+		}
+		pointBodies[i] = (uint8_t)rank[slotIndex[slot]];
+	}
+
+	// The base frames sit at the ends (generic joint queries and drawing).
+	b3JointDef jointDef = def->base;
+	jointDef.bodyIdA = bodyIds[order[0]];
+	jointDef.bodyIdB = bodyIds[order[1]];
+	b3Vec3 first = def->localPoints[0];
+	b3Vec3 last = def->localPoints[count - 1];
+	jointDef.localFrameA = (b3Transform){ pointBodies[0] == 0 ? first : b3Vec3_zero, b3Quat_identity };
+	jointDef.localFrameB = (b3Transform){ pointBodies[count - 1] == 1 ? last : b3Vec3_zero, b3Quat_identity };
+	if ( bodyCount > 2 )
+	{
+		// Which pair is the joint's own depends on the order above: all of them collide.
+		jointDef.collideConnected = true;
+	}
+
+	int ropeId = b3AllocId( &world->ropeIdPool );
+	if ( ropeId == world->ropes.count )
+	{
+		b3Array_Push( world->ropes, (b3RopeData){ 0 } );
+	}
+	b3RopeData* rope = b3Array_Get( world->ropes, ropeId );
+	memset( rope, 0, sizeof( b3RopeData ) );
+	rope->bodyCount = bodyCount;
+	for ( int k = 0; k < B3_MAX_ROPE_BODIES; ++k )
+	{
+		rope->bodyIds[k] = k < bodyCount ? b3GetBodyFullId( world, bodyIds[order[k]] )->id : B3_NULL_INDEX;
+		rope->linkJointIds[k] = B3_NULL_INDEX;
+	}
+	for ( int i = 0; i < count; ++i )
+	{
+		rope->localPoints[i] = def->localPoints[i];
+		rope->pointBodies[i] = pointBodies[i];
 	}
 	// Only inner points grip.
 	for ( int i = 1; i + 1 < count; ++i )
 	{
 		float friction = def->friction[i];
-		joint->ropeJoint.friction[i] = b3IsValidFloat( friction ) ? b3MaxFloat( friction, 0.0f ) : 0.0f;
+		rope->friction[i] = b3IsValidFloat( friction ) ? b3MaxFloat( friction, 0.0f ) : 0.0f;
 	}
-	joint->ropeJoint.pointCount = count;
-	joint->ropeJoint.bodyBMask = def->bodyBMask & ( ( 1u << count ) - 1u );
-	joint->ropeJoint.length = b3ClampFloat( def->length, B3_LINEAR_SLOP, B3_HUGE );
-	joint->ropeJoint.stiffness = b3MaxFloat( def->stiffness, 0.0f );
-	joint->ropeJoint.dampingRatio = b3MaxFloat( def->dampingRatio, 0.0f );
-	joint->ropeJoint.bendStiffness = b3IsValidFloat( def->bendStiffness ) ? b3MaxFloat( def->bendStiffness, 0.0f ) : 0.0f;
-	joint->ropeJoint.bendDamping = b3IsValidFloat( def->bendDamping ) ? b3MaxFloat( def->bendDamping, 0.0f ) : 0.0f;
-	joint->ropeJoint.impulse = 0.0f;
-	b3SetRopeJointRest( world, joint );
+	rope->pointCount = count;
+	rope->length = b3ClampFloat( def->length, B3_LINEAR_SLOP, B3_HUGE );
+	rope->stiffness = b3MaxFloat( def->stiffness, 0.0f );
+	rope->dampingRatio = b3MaxFloat( def->dampingRatio, 0.0f );
+	rope->bendStiffness = b3IsValidFloat( def->bendStiffness ) ? b3MaxFloat( def->bendStiffness, 0.0f ) : 0.0f;
+	rope->bendDamping = b3IsValidFloat( def->bendDamping ) ? b3MaxFloat( def->bendDamping, 0.0f ) : 0.0f;
+	rope->impulse = 0.0f;
+	b3SetRopeJointRest( world, rope );
 
-	b3JointId jointId = { joint->jointId + 1, world->worldId, pair.joint->generation };
-	B3_REC_CREATE( world, CreateRopeJoint, jointId, worldId, *def );
-	return jointId;
+	// The rope data first: graph coloring reads the body count.
+	b3JointPair pair = b3CreateJoint( world, &jointDef, b3_ropeJoint, ropeId );
+	int jointId = pair.joint->jointId;
+	uint16_t generation = pair.joint->generation;
+	pair.jointSim->ropeJoint = (b3RopeJoint){ .ropeId = ropeId };
+	b3Array_Get( world->ropes, ropeId )->jointId = jointId;
+
+	// Bodies 2 and 3 hang on link joints to body 0, or to body 1 when 0 is not dynamic. Joint
+	// creation moves joint sims and may grow the joint array: no pointers kept across it.
+	int anchor = ( dynamic[order[0]] || dynamic[order[1]] == false ) ? 0 : 1;
+	for ( int k = 2; k < bodyCount; ++k )
+	{
+		b3JointDef linkDef = b3DefaultJointDef();
+		linkDef.bodyIdA = bodyIds[order[anchor]];
+		linkDef.bodyIdB = bodyIds[order[k]];
+		linkDef.collideConnected = true;
+		linkDef.userData = def->base.userData;
+		b3JointPair link = b3CreateJoint( world, &linkDef, b3_ropeLinkJoint, ropeId );
+		b3Array_Get( world->ropes, ropeId )->linkJointIds[k] = link.joint->jointId;
+	}
+
+	b3JointId id = { jointId + 1, world->worldId, generation };
+	B3_REC_CREATE( world, CreateRopeJoint, id, worldId, *def );
+	return id;
 }
 
 b3JointId b3CreateMotorJoint( b3WorldId worldId, const b3MotorJointDef* def )
@@ -578,7 +681,7 @@ b3JointId b3CreateMotorJoint( b3WorldId worldId, const b3MotorJointDef* def )
 		return (b3JointId){ 0 };
 	}
 
-	b3JointPair pair = b3CreateJoint( world, &def->base, b3_motorJoint );
+	b3JointPair pair = b3CreateJoint( world, &def->base, b3_motorJoint, B3_NULL_INDEX );
 	b3JointSim* joint = pair.jointSim;
 
 	joint->motorJoint = (b3MotorJoint){ 0 };
@@ -607,7 +710,7 @@ b3JointId b3CreateFilterJoint( b3WorldId worldId, const b3FilterJointDef* def )
 		return (b3JointId){ 0 };
 	}
 
-	b3JointPair pair = b3CreateJoint( world, &def->base, b3_filterJoint );
+	b3JointPair pair = b3CreateJoint( world, &def->base, b3_filterJoint, B3_NULL_INDEX );
 
 	b3JointSim* joint = pair.jointSim;
 
@@ -629,7 +732,7 @@ b3JointId b3CreateParallelJoint( b3WorldId worldId, const b3ParallelJointDef* de
 	B3_ASSERT( b3IsValidFloat( def->dampingRatio ) && def->dampingRatio >= 0.0f );
 	B3_ASSERT( b3IsValidFloat( def->maxTorque ) && def->maxTorque >= 0.0f );
 
-	b3JointPair pair = b3CreateJoint( world, &def->base, b3_parallelJoint );
+	b3JointPair pair = b3CreateJoint( world, &def->base, b3_parallelJoint, B3_NULL_INDEX );
 
 	b3JointSim* joint = pair.jointSim;
 
@@ -654,7 +757,7 @@ b3JointId b3CreatePrismaticJoint( b3WorldId worldId, const b3PrismaticJointDef* 
 		return (b3JointId){ 0 };
 	}
 
-	b3JointPair pair = b3CreateJoint( world, &def->base, b3_prismaticJoint );
+	b3JointPair pair = b3CreateJoint( world, &def->base, b3_prismaticJoint, B3_NULL_INDEX );
 
 	b3JointSim* joint = pair.jointSim;
 
@@ -685,7 +788,7 @@ b3JointId b3CreateRevoluteJoint( b3WorldId worldId, const b3RevoluteJointDef* de
 		return (b3JointId){ 0 };
 	}
 
-	b3JointPair pair = b3CreateJoint( world, &def->base, b3_revoluteJoint );
+	b3JointPair pair = b3CreateJoint( world, &def->base, b3_revoluteJoint, B3_NULL_INDEX );
 
 	b3JointSim* joint = pair.jointSim;
 
@@ -722,7 +825,7 @@ b3JointId b3CreateSphericalJoint( b3WorldId worldId, const b3SphericalJointDef* 
 		return (b3JointId){ 0 };
 	}
 
-	b3JointPair pair = b3CreateJoint( world, &def->base, b3_sphericalJoint );
+	b3JointPair pair = b3CreateJoint( world, &def->base, b3_sphericalJoint, B3_NULL_INDEX );
 
 	b3JointSim* joint = pair.jointSim;
 
@@ -763,7 +866,7 @@ b3JointId b3CreateWeldJoint( b3WorldId worldId, const b3WeldJointDef* def )
 		return (b3JointId){ 0 };
 	}
 
-	b3JointPair pair = b3CreateJoint( world, &def->base, b3_weldJoint );
+	b3JointPair pair = b3CreateJoint( world, &def->base, b3_weldJoint, B3_NULL_INDEX );
 
 	b3JointSim* joint = pair.jointSim;
 
@@ -789,7 +892,7 @@ b3JointId b3CreateWheelJoint( b3WorldId worldId, const b3WheelJointDef* def )
 		return (b3JointId){ 0 };
 	}
 
-	b3JointPair pair = b3CreateJoint( world, &def->base, b3_wheelJoint );
+	b3JointPair pair = b3CreateJoint( world, &def->base, b3_wheelJoint, B3_NULL_INDEX );
 
 	b3JointSim* joint = pair.jointSim;
 
@@ -818,7 +921,7 @@ b3JointId b3CreateWheelJoint( b3WorldId worldId, const b3WheelJointDef* def )
 	return jointId;
 }
 
-void b3DestroyJointInternal( b3World* world, b3Joint* joint, bool wakeBodies )
+static void b3DestroyJointBase( b3World* world, b3Joint* joint, bool wakeBodies )
 {
 	int jointId = joint->jointId;
 
@@ -924,6 +1027,67 @@ void b3DestroyJointInternal( b3World* world, b3Joint* joint, bool wakeBodies )
 
 	b3ValidateSolverSets( world );
 }
+
+// A rope goes with its links, and destroying a link (its third or fourth body going) destroys
+// its rope. The joint array keeps its storage while joints are destroyed.
+void b3DestroyJointInternal( b3World* world, b3Joint* joint, bool wakeBodies )
+{
+	if ( joint->type == b3_ropeLinkJoint )
+	{
+		b3RopeData* rope = b3Array_Get( world->ropes, joint->ropeId );
+		joint = b3Array_Get( world->joints, rope->jointId );
+	}
+
+	if ( joint->type != b3_ropeJoint )
+	{
+		b3DestroyJointBase( world, joint, wakeBodies );
+		return;
+	}
+
+	int ropeId = joint->ropeId;
+	b3RopeData* rope = b3Array_Get( world->ropes, ropeId );
+	for ( int k = 2; k < rope->bodyCount; ++k )
+	{
+		if ( rope->linkJointIds[k] != B3_NULL_INDEX )
+		{
+			b3DestroyJointBase( world, b3Array_Get( world->joints, rope->linkJointIds[k] ), wakeBodies );
+		}
+	}
+	b3DestroyJointBase( world, joint, wakeBodies );
+
+	memset( rope, 0, sizeof( b3RopeData ) );
+	rope->jointId = B3_NULL_INDEX;
+	b3FreeId( &world->ropeIdPool, ropeId );
+}
+
+// Destroy the ropes on a body before a walk of its joint list destroys the rest: a rope takes
+// joints out of the list besides the one the walk is at.
+void b3DestroyBodyRopes( b3World* world, b3Body* body, bool wakeBodies )
+{
+	int jointKey = body->headJointKey;
+	while ( jointKey != B3_NULL_INDEX )
+	{
+		b3Joint* joint = b3Array_Get( world->joints, jointKey >> 1 );
+		if ( joint->type == b3_ropeJoint || joint->type == b3_ropeLinkJoint )
+		{
+			b3DestroyJointInternal( world, joint, wakeBodies );
+			jointKey = body->headJointKey;
+			continue;
+		}
+		jointKey = joint->edges[jointKey & 1].nextKey;
+	}
+}
+
+// The joint the API reports for a joint on a body's list: a rope for its link.
+int b3ReportedJointId( b3World* world, b3Joint* joint )
+{
+	if ( joint->type == b3_ropeLinkJoint )
+	{
+		return b3Array_Get( world->ropes, joint->ropeId )->jointId;
+	}
+	return joint->jointId;
+}
+
 
 void b3DestroyJoint( b3JointId jointId, bool wakeAttached )
 {
@@ -1208,7 +1372,7 @@ void b3GetJointReaction( b3World* world, b3JointSim* sim, float invTimeStep, flo
 		break;
 
 		case b3_ropeJoint:
-			linearImpulse = b3GetRopeJointMaxImpulse( &sim->ropeJoint );
+			linearImpulse = b3GetRopeJointMaxImpulse( b3GetRopeData( world, sim ) );
 			break;
 
 		default:
@@ -1255,6 +1419,9 @@ static b3Vec3 b3GetJointConstraintForce( b3World* world, b3Joint* joint )
 		case b3_ropeJoint:
 			return b3GetRopeJointForce( world, base );
 
+		case b3_ropeLinkJoint:
+			return b3Vec3_zero;
+
 		default:
 			B3_ASSERT( false );
 			return b3Vec3_zero;
@@ -1295,6 +1462,9 @@ static b3Vec3 b3GetJointConstraintTorque( b3World* world, b3Joint* joint )
 			return b3GetWheelJointTorque( world, base );
 
 		case b3_ropeJoint:
+			return b3Vec3_zero;
+
+		case b3_ropeLinkJoint:
 			return b3Vec3_zero;
 
 		default:
@@ -1394,10 +1564,10 @@ float b3Joint_GetLinearSeparation( b3JointId jointId )
 		}
 
 		case b3_ropeJoint:
-		{
-			b3RopeJoint* ropeJoint = &base->ropeJoint;
-			return b3MaxFloat( 0.0f, b3GetRopeJointLength( world, base ) - ropeJoint->length );
-		}
+			return b3MaxFloat( 0.0f, b3GetRopeJointLength( world, base ) - b3GetRopeData( world, base )->length );
+
+		case b3_ropeLinkJoint:
+			return 0.0f;
 
 		case b3_revoluteJoint:
 			return b3Length( dp );
@@ -1540,6 +1710,9 @@ float b3Joint_GetAngularSeparation( b3JointId jointId )
 		case b3_ropeJoint:
 			return 0.0f;
 
+		case b3_ropeLinkJoint:
+			return 0.0f;
+
 		default:
 			B3_ASSERT( false );
 			return 0.0f;
@@ -1632,6 +1805,9 @@ void b3PrepareJoint( b3JointSim* joint, b3StepContext* context )
 			b3PrepareRopeJoint( joint, context );
 			break;
 
+		case b3_ropeLinkJoint:
+			break;
+
 		default:
 			B3_ASSERT( false );
 	}
@@ -1678,6 +1854,9 @@ void b3WarmStartJoint( b3JointSim* joint, b3StepContext* context )
 
 		case b3_ropeJoint:
 			b3WarmStartRopeJoint( joint, context );
+			break;
+
+		case b3_ropeLinkJoint:
 			break;
 
 		default:
@@ -1728,6 +1907,9 @@ void b3SolveJoint( b3JointSim* joint, b3StepContext* context, bool useBias )
 
 		case b3_ropeJoint:
 			b3SolveRopeJoint( joint, context, useBias );
+			break;
+
+		case b3_ropeLinkJoint:
 			break;
 
 		default:
@@ -1847,7 +2029,10 @@ void b3DrawJoint( b3DebugDraw* draw, b3World* world, b3Joint* joint )
 			break;
 
 		case b3_ropeJoint:
-			b3DrawRopeJoint( draw, jointSim, transformA, transformB );
+			b3DrawRopeJoint( draw, world, jointSim );
+			break;
+
+		case b3_ropeLinkJoint:
 			break;
 
 		default:
