@@ -23,6 +23,7 @@
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // these are useful for solver testing
 #define ITERATIONS 1
@@ -698,6 +699,7 @@ static void b3FinalizeBodiesTask( int startIndex, int endIndex, int workerIndex,
 
 	b3TaskContext* taskContext = world->taskContexts.data + workerIndex;
 	b3BitSet* awakeIslandBitSet = &taskContext->awakeIslandBitSet;
+	b3BitSet* splitIslandBitSet = &taskContext->splitIslandBitSet;
 
 	const float speculativeScalar = B3_SPECULATIVE_DISTANCE;
 
@@ -823,16 +825,9 @@ static void b3FinalizeBodiesTask( int startIndex, int endIndex, int workerIndex,
 		}
 		else if ( island->constraintRemoveCount > 0 )
 		{
-			// Body wants to sleep but its island needs splitting first. Track the sleepiest candidate.
-			// Break sleep time ties using the island id to ensure determinism. The cross worker reduction
-			// breaks ties the same way.
-			if ( body->sleepTime > taskContext->splitSleepTime ||
-				 ( body->sleepTime == taskContext->splitSleepTime && body->islandId > taskContext->splitIslandId ) )
-			{
-				// pick the sleepiest candidate
-				taskContext->splitIslandId = body->islandId;
-				taskContext->splitSleepTime = body->sleepTime;
-			}
+			// Body wants to sleep but its island needs splitting first. Every such island splits at the
+			// end of this step: whether and when an island splits depends on that island alone.
+			b3SetBit( splitIslandBitSet, island->localIndex );
 		}
 
 		// Update shapes AABBs
@@ -1441,6 +1436,12 @@ static void b3BulletBodyTask( int startIndex, int endIndex, int workerIndex, voi
 #endif
 
 // Solve with graph coloring
+static int b3CompareInts( const void* a, const void* b )
+{
+	int x = *(const int*)a, y = *(const int*)b;
+	return x < y ? -1 : ( x > y ? 1 : 0 );
+}
+
 void b3Solve( b3World* world, b3StepContext* stepContext )
 {
 	// Only count steps that advance the simulation
@@ -1878,8 +1879,7 @@ void b3Solve( b3World* world, b3StepContext* stepContext )
 			b3TaskContext* taskContext = world->taskContexts.data + i;
 			b3Array_Clear( taskContext->sensorHits );
 			b3SetBitCountAndClear( &taskContext->awakeIslandBitSet, awakeIslandCount );
-			taskContext->splitIslandId = B3_NULL_INDEX;
-			taskContext->splitSleepTime = 0.0f;
+			b3SetBitCountAndClear( &taskContext->splitIslandBitSet, awakeIslandCount );
 		}
 
 		// Finish the user tree task that was queued earlier in the time step. This must be complete before touching the
@@ -2204,25 +2204,13 @@ void b3Solve( b3World* world, b3StepContext* stepContext )
 		b3TracyCZoneNC( sleep_islands, "Island Sleep", b3_colorLightSlateGray, true );
 		uint64_t sleepTicks = b3GetTicks();
 
-		// Collect split island candidate for the next time step. No need to split if sleeping is disabled.
+		// Islands that want to sleep but must split first, from every worker, by island id: read before
+		// the sleep pass below reorders the awake islands.
 		B3_ASSERT( world->splitIslandId == B3_NULL_INDEX );
-		float splitSleepTimer = 0.0f;
-		for ( int i = 0; i < world->workerCount; ++i )
+		b3BitSet* splitIslandBitSet = &world->taskContexts.data[0].splitIslandBitSet;
+		for ( int i = 1; i < world->workerCount; ++i )
 		{
-			b3TaskContext* taskContext = world->taskContexts.data + i;
-			if ( taskContext->splitIslandId != B3_NULL_INDEX && taskContext->splitSleepTime >= splitSleepTimer )
-			{
-				B3_ASSERT( taskContext->splitSleepTime > 0.0f );
-
-				// Tie breaking for determinism. Largest island id wins. Needed due to work stealing.
-				if ( taskContext->splitSleepTime == splitSleepTimer && taskContext->splitIslandId < world->splitIslandId )
-				{
-					continue;
-				}
-
-				world->splitIslandId = taskContext->splitIslandId;
-				splitSleepTimer = taskContext->splitSleepTime;
-			}
+			b3InPlaceUnion( splitIslandBitSet, &world->taskContexts.data[i].splitIslandBitSet );
 		}
 
 		b3BitSet* awakeIslandBitSet = &world->taskContexts.data[0].awakeIslandBitSet;
@@ -2234,6 +2222,16 @@ void b3Solve( b3World* world, b3StepContext* stepContext )
 		// Need to process in reverse because this moves islands to sleeping solver sets.
 		b3IslandSim* islands = awakeSet->islandSims.data;
 		int count = awakeSet->islandSims.count;
+		int* splitIds = b3StackAlloc( &world->stack, ( count > 0 ? count : 1 ) * sizeof( int ), "split islands" );
+		int splitCount = 0;
+		for ( int islandIndex = 0; islandIndex < count; ++islandIndex )
+		{
+			if ( b3GetBit( splitIslandBitSet, islandIndex ) )
+			{
+				splitIds[splitCount++] = islands[islandIndex].islandId;
+			}
+		}
+
 		for ( int islandIndex = count - 1; islandIndex >= 0; islandIndex -= 1 )
 		{
 			if ( b3GetBit( awakeIslandBitSet, islandIndex ) == true )
@@ -2247,6 +2245,22 @@ void b3Solve( b3World* world, b3StepContext* stepContext )
 
 			b3TrySleepIsland( world, islandId );
 		}
+
+		// Split every candidate (an island with a pending split never sleeps above). Each island splits
+		// in the step its bodies first want to sleep, whatever else wants to: its own steps, sleep
+		// included, depend on it alone (local rollback restores and steps one island).
+		uint64_t splitTicks = b3GetTicks();
+		qsort( splitIds, splitCount, sizeof( int ), b3CompareInts );
+		for ( int i = 0; i < splitCount; ++i )
+		{
+			b3Island* island = b3Array_Get( world->islands, splitIds[i] );
+			if ( island->setIndex == b3_awakeSet && island->constraintRemoveCount > 0 )
+			{
+				b3SplitIsland( world, splitIds[i] );
+			}
+		}
+		b3StackFree( &world->stack, splitIds );
+		world->profile.splitIslands += b3GetMilliseconds( splitTicks );
 
 		b3ValidateSolverSets( world );
 

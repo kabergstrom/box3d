@@ -40,6 +40,7 @@ extern int HashTest( void );
 extern int HeightFieldTest( void );
 extern int HullTest( void );
 extern int IdTest( void );
+extern int IslandIndependenceTest( void );
 extern int JointTest( void );
 extern int LargeWorldTest( void );
 extern int ManifoldTest( void );
@@ -133,6 +134,7 @@ int main( int argc, char** argv )
 	MAYBE_RUN_TEST( TableTest );
 	MAYBE_RUN_TEST( WorldTest );
 	MAYBE_RUN_TEST( WorldDeltaTest );
+	MAYBE_RUN_TEST( IslandIndependenceTest );
 
 	printf( "======================================\n" );
 	printf( "All Box3D tests passed!\n" );

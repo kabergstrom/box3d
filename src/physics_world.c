@@ -31,6 +31,7 @@
 #include <float.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 _Static_assert( B3_MAX_WORLDS > 0, "must be 1 or more" );
@@ -183,7 +184,7 @@ static void b3CreateWorkerContexts( b3World* world )
 		world->taskContexts.data[i].hasHitEvents = false;
 		world->taskContexts.data[i].jointStateBitSet = b3CreateBitSet( 1024 );
 		world->taskContexts.data[i].awakeIslandBitSet = b3CreateBitSet( 256 );
-		world->taskContexts.data[i].splitIslandId = B3_NULL_INDEX;
+		world->taskContexts.data[i].splitIslandBitSet = b3CreateBitSet( 256 );
 
 		world->sensorTaskContexts.data[i].eventBits = b3CreateBitSet( 128 );
 	}
@@ -200,6 +201,7 @@ static void b3DestroyWorkerContexts( b3World* world )
 		b3DestroyBitSet( &world->taskContexts.data[i].hitEventBitSet );
 		b3DestroyBitSet( &world->taskContexts.data[i].jointStateBitSet );
 		b3DestroyBitSet( &world->taskContexts.data[i].awakeIslandBitSet );
+		b3DestroyBitSet( &world->taskContexts.data[i].splitIslandBitSet );
 
 		b3DestroyBitSet( &world->sensorTaskContexts.data[i].eventBits );
 	}
@@ -827,6 +829,67 @@ static void b3RemoveNonTouchingContact( b3World* world, int setIndex, int localI
 	}
 }
 
+// Contacts that began touching this step, in shape pair order: what an island's contacts
+// enter the constraint graph's colors in depends only on that island, not on contact ids
+// (a pool the whole world shares).
+typedef struct b3StartedContact
+{
+	uint64_t key;
+	int contactId;
+} b3StartedContact;
+
+static int b3CompareStartedContacts( const void* a, const void* b )
+{
+	uint64_t ka = ( (const b3StartedContact*)a )->key;
+	uint64_t kb = ( (const b3StartedContact*)b )->key;
+	return ka < kb ? -1 : ( ka > kb ? 1 : 0 );
+}
+
+static void b3BeginContactTouch( b3World* world, int contactId )
+{
+	const b3Shape* shapes = world->shapes.data;
+	uint16_t worldId = world->worldId;
+	b3Contact* contact = b3Array_Get( world->contacts, contactId );
+	const b3Shape* shapeA = shapes + contact->shapeIdA;
+	const b3Shape* shapeB = shapes + contact->shapeIdB;
+	b3ShapeId shapeIdA = { shapeA->id + 1, worldId, shapeA->generation };
+	b3ShapeId shapeIdB = { shapeB->id + 1, worldId, shapeB->generation };
+	b3ContactId contactFullId = {
+		.index1 = contactId + 1,
+		.world0 = worldId,
+		.padding = 0,
+		.generation = contact->generation,
+	};
+	uint32_t flags = contact->flags;
+	B3_ASSERT( contact->islandId == B3_NULL_INDEX );
+
+	if ( flags & b3_contactEnableContactEvents )
+	{
+		b3ContactBeginTouchEvent event = { shapeIdA, shapeIdB, contactFullId };
+		b3Array_Push( world->contactBeginEvents, event );
+	}
+
+	B3_ASSERT( contact->manifoldCount > 0 );
+	B3_ASSERT( contact->setIndex == b3_awakeSet );
+
+	// Link first because this wakes colliding bodies and ensures the body sims
+	// are in the correct place.
+	contact->flags &= ~b3_simStartedTouching;
+	contact->flags |= b3_contactTouchingFlag;
+	b3LinkContact( world, contact );
+
+	// Make sure these didn't change
+	B3_ASSERT( contact->colorIndex == B3_NULL_INDEX );
+
+	// Contact sim pointer may have become orphaned due to awake set growth,
+	// so I just need to refresh it.
+
+	int oldLocalIndex = contact->localIndex;
+
+	b3AddContactToGraph( world, contact );
+	b3RemoveNonTouchingContact( world, b3_awakeSet, oldLocalIndex );
+}
+
 // Narrow-phase collision
 static void b3Collide( b3StepContext* context )
 {
@@ -944,6 +1007,10 @@ static void b3Collide( b3StepContext* context )
 	const b3Shape* shapes = world->shapes.data;
 	uint16_t worldId = world->worldId;
 
+	b3StartedContact* started =
+		b3StackAlloc( &world->stack, ( contactIdCapacity > 0 ? contactIdCapacity : 1 ) * sizeof( b3StartedContact ), "started" );
+	int startedCount = 0;
+
 	// Process contact state changes. Iterate over set bits
 	for ( uint32_t k = 0; k < bitSet->blockCount; ++k )
 	{
@@ -976,33 +1043,10 @@ static void b3Collide( b3StepContext* context )
 			}
 			else if ( flags & b3_simStartedTouching )
 			{
-				B3_ASSERT( contact->islandId == B3_NULL_INDEX );
-
-				if ( flags & b3_contactEnableContactEvents )
-				{
-					b3ContactBeginTouchEvent event = { shapeIdA, shapeIdB, contactFullId };
-					b3Array_Push( world->contactBeginEvents, event );
-				}
-
-				B3_ASSERT( contact->manifoldCount > 0 );
-				B3_ASSERT( contact->setIndex == b3_awakeSet );
-
-				// Link first because this wakes colliding bodies and ensures the body sims
-				// are in the correct place.
-				contact->flags &= ~b3_simStartedTouching;
-				contact->flags |= b3_contactTouchingFlag;
-				b3LinkContact( world, contact );
-
-				// Make sure these didn't change
-				B3_ASSERT( contact->colorIndex == B3_NULL_INDEX );
-
-				// Contact sim pointer may have become orphaned due to awake set growth,
-				// so I just need to refresh it.
-
-				int oldLocalIndex = contact->localIndex;
-
-				b3AddContactToGraph( world, contact );
-				b3RemoveNonTouchingContact( world, b3_awakeSet, oldLocalIndex );
+				started[startedCount++] = ( b3StartedContact ){
+					.key = ( (uint64_t)(uint32_t)contact->shapeIdA << 32 ) | (uint32_t)contact->shapeIdB,
+					.contactId = contactId,
+				};
 			}
 			else if ( flags & b3_simStoppedTouching )
 			{
@@ -1036,6 +1080,13 @@ static void b3Collide( b3StepContext* context )
 			bits = bits & ( bits - 1 );
 		}
 	}
+
+	qsort( started, startedCount, sizeof( b3StartedContact ), b3CompareStartedContacts );
+	for ( int i = 0; i < startedCount; ++i )
+	{
+		b3BeginContactTouch( world, started[i].contactId );
+	}
+	b3StackFree( &world->stack, started );
 
 	b3ValidateSolverSets( world );
 	b3ValidateContacts( world );

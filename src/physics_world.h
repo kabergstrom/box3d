@@ -96,9 +96,8 @@ typedef struct b3TaskContext
 	// Used to put islands to sleep
 	b3BitSet awakeIslandBitSet;
 
-	// Per worker split island candidate
-	float splitSleepTime;
-	int splitIslandId;
+	// Per worker islands that want to sleep but must split first, by awake island index
+	b3BitSet splitIslandBitSet;
 
 	// Profiling
 	int satCallCount;
@@ -237,6 +236,9 @@ typedef struct b3World
 	// - islands that have removed constraints must be put split first because I don't want to wake bodies incorrectly
 	// - otherwise I can use the awake islands that have bodies wanting to sleep as the splitting candidates
 	// - if no bodies want to sleep then there is no reason to perform island splitting
+	// Every candidate now splits at the end of the step that found it (b3SolverStage... sleep pass),
+	// so an island's split never waits on another island's: this is always B3_NULL_INDEX between
+	// steps. Kept for the snapshot and world delta layouts.
 	int splitIslandId;
 
 	b3Vec3 gravity;

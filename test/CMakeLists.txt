@@ -17,6 +17,7 @@ set(BOX3D_TEST_FILES
     test_height_field.c
     test_hull.c
     test_id.c
+    test_island_independence.c
     test_joint.c
     test_large_world.c
     test_macros.h
